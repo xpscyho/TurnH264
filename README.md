@@ -18,6 +18,7 @@ Please do note that this program is untested for macOS as neither me nor any of 
 ---
 
 ## Compilation:
+These commands must run on the OS that you want to compile for.
 
 Simple: run `python compile.py` ( + `--onefile` if desired )
 

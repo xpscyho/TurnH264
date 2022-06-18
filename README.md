@@ -35,6 +35,7 @@ Todo:
 
 -   [ ] Add a progress bar
 -   [ ] NVENC and VCE
+-   [ ] automatically install ffmpeg if not detected
 
 ---
 

@@ -20,16 +20,13 @@ Please do note that this program is untested for macOS as neither me nor any of 
 ## Compilation:
 These commands must run on the OS that you want to compile for.
 
-Simple: run `python compile.py` ( + `--onefile` if desired )
+Simple: run `python compile.py`
 
 otherwise:
 
 ```bash
   pip install pyinstaller pyside6
-  pyinstaller --icon=icon.ico TurnH264.py
-
-#if you want a single file add the following in the command:
-  `--onefile`
+  pyinstaller TurnH264.py
 ```
 
 Todo:

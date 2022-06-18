@@ -30,4 +30,4 @@ Todo:
 - [ ] Add a progress bar
 - [ ] NVENC and VCE
  --- 
-My fork was developed alongside this master branch during pre-release hence the differences in variable names and major differences in code layout.
+My fork was developed alongside this master branch during pre-release hence the differences in code.

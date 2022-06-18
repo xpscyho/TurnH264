@@ -1,300 +1,331 @@
-# coding: utf-8
-from base64 import encode
-from ctypes import alignment
 import os
-import sys
-import time
 import signal
-import threading
 import subprocess
-from PySide6 import QtCore, QtWidgets
+import sys
+import threading
+import time
 
-thread_count = os.cpu_count() #Make usages of os.cpu_count() more readable
+# these are used, but run in exec so they are shown as unused
+from PySide6 import QtWidgets
+from PySide6.QtCore import Qt
 
-class MainWindow(QtWidgets.QWidget): #Main class
+
+class timer:  # timer setup ####
+    def start():
+        timer.timer_start_time = time.time()
+
+    def print(instr):
+        if timer.timer_start_time is None:
+            timer.start()
+            print("Started timer")
+            return
+        now = time.time()
+        diff = (now - timer.timer_start_time) * 1000
+        timer.timer_start_time = now
+        print(f"{instr}: ms{diff:.4f}")
+        return diff
+
+    def reset():
+        timer.timer_start_time = time.time()
+
+
+timer.reset()
+
+
+class MainWindow(QtWidgets.QWidget):
     def __init__(self):
-        super().__init__()
+        super(MainWindow, self).__init__()
+        timer.print("Starting")
         self.setWindowTitle("TurnH264")
+        self.resize(320, 260)
+        self.setMinimumSize(320, 260)
+        # force column 0 to fit content
+        self.addwidgets()
+        self.slider_changed()  # to update ratio
 
-        self.go_button = QtWidgets.QPushButton("Go")
-        self.cancel_button = QtWidgets.QPushButton("Cancel Process")
-        self.choose_file_button = QtWidgets.QPushButton("Choose a File")
-        self.choose_output_button = QtWidgets.QPushButton("Choose output")
-        self.overwrite_existing_button = QtWidgets.QPushButton("Overwrite")
-        self.dont_overwrite_button = QtWidgets.QPushButton("Cancel")
-        self.about_button = QtWidgets.QPushButton("About Program")
-        self.help_button = QtWidgets.QPushButton("Help")
-        self.threads = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.threads.setTickInterval(1)
-        self.threads.setMaximum(thread_count)
-        self.threads.setValue(thread_count/2)
-        self.audio_bitrate = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.audio_bitrate.setMinimum(64/32)
-        self.audio_bitrate.setMaximum(256/32)
-        self.audio_bitrate.setValue(160/32)
-        self.input_dialog = QtWidgets.QLabel("Input the path to the video:",
-                                alignment=QtCore.Qt.AlignCenter)
-        self.bitrate_dialog = QtWidgets.QLabel("Input the bitrate in kilobits per second in thousands, like \"1000k\":",
-                                alignment=QtCore.Qt.AlignCenter)
-        self.thread_dialog = QtWidgets.QLabel(f"Select the number of CPU threads to use: {self.threads.value()} / {thread_count}",
-                                alignment=QtCore.Qt.AlignCenter)
-        self.audio_bitrate_dialog = QtWidgets.QLabel(f"Select the audio bitrate: {self.audio_bitrate.value()*32}",
-                                alignment=QtCore.Qt.AlignCenter)
-        self.input_file = QtWidgets.QLineEdit(self,
-                                alignment=QtCore.Qt.AlignCenter)
-        self.bitrate = QtWidgets.QLineEdit(self,
-                                alignment=QtCore.Qt.AlignCenter)
-        self.output_dialog = QtWidgets.QLabel("Input where to save the output:",
-                                alignment=QtCore.Qt.AlignCenter)
-        self.output_file = QtWidgets.QLineEdit(self,
-                                alignment=QtCore.Qt.AlignCenter)
-        self.audio_codec_text = QtWidgets.QLabel("Use AAC or Opus?",
-                                            alignment=QtCore.Qt.AlignCenter)
-        self.audio_codec = QtWidgets.QComboBox(self)
-        self.audio_codec.addItems(["AAC", "Opus"])
+    def addwidgets(self):
+        global widget_layout, widget_buttons, widget_boxes
+        widget_layout = {
+            "input_dialog":         ["Label", "Input video:",                         "Center", "YE_HIDE", (1, 0, 1, 1)],
+            "output_dialog":        ["Label", "Output:",                              "Center", "YE_HIDE", (2, 0, 1, 1)],
+            "v_bitrate_dialog_1":   ["Label", "Video bitrate:",                       "Center", "YE_HIDE", (3, 0, 1, 1)],
+            "v_bitrate_dialog_2":   ["Label", "kb/s",                                 "Center", "YE_HIDE", (3, 3, 1, 2)],
+            "a_bitrate_dialog_1":   ["Label", "Audio bitrate:",                       "Center", "YE_HIDE", (4, 0, 1, 1)],
+            "threads_dialog":       ["Label", "Threads:",                             "Center", "YE_HIDE", (5, 0, 1, 1)],
+            "threads_dialog_ratio": ["Label", "",                                     "Center", "YE_HIDE", (5, 3, 1, 2)],
+            "speed_dialog":         ["Label", "Speed:",                               "Center", "YE_HIDE", (6, 0, 1, 1)],
+            "status_dialog":        ["Label", "Awaiting input",                       "Center", "NO_HIDE", (7, 0, 1, 5)],
 
-        self.layout = QtWidgets.QGridLayout(self)
-        self.layout.addWidget(self.input_dialog, 0, 0, 1, 2)
-        self.layout.addWidget(self.input_file, 1, 0, 1, 1)
-        self.layout.addWidget(self.choose_file_button, 1, 1, 1, 1)
-        self.layout.addWidget(self.output_dialog, 2, 0, 1, 1)
-        self.layout.addWidget(self.output_file, 3, 0, 1, 1)
-        self.layout.addWidget(self.choose_output_button, 3, 1, 1, 1)
-        self.layout.addWidget(self.bitrate_dialog, 4, 0, 1, 2)
-        self.layout.addWidget(self.bitrate, 5, 0, 1, 2)
-        self.layout.addWidget(self.audio_codec_text, 6, 0, 1, 1)
-        self.layout.addWidget(self.audio_codec, 6, 1, 1, 1)
-        self.layout.addWidget(self.audio_bitrate_dialog, 7, 0, 1, 1)
-        self.layout.addWidget(self.audio_bitrate, 7, 1, 1, 1)
-        self.layout.addWidget(self.thread_dialog, 8, 0, 1, 1)
-        self.layout.addWidget(self.threads, 8, 1, 1, 1)
-        self.layout.addWidget(self.go_button, 9, 0, 1, 2)
-        self.layout.addWidget(self.cancel_button, 9, 0, 1, 2)
-        self.layout.addWidget(self.overwrite_existing_button, 9, 0, 1, 1)
-        self.layout.addWidget(self.dont_overwrite_button, 9, 1, 1, 1)
-        self.layout.addWidget(self.about_button, 10, 1, 1, 1,)
-        self.layout.addWidget(self.help_button, 10, 0, 1, 1)
-        self.overwrite_existing_button.hide()
-        self.dont_overwrite_button.hide()
-        self.cancel_button.hide()
-        
-        self.choose_file_button.clicked.connect(self.choose_file)
-        self.go_button.clicked.connect(self.go_button_clicked)
-        self.threads.valueChanged.connect(self.threads_slider_updated)
-        self.audio_bitrate.valueChanged.connect(self.audio_slider_updated)
-        self.overwrite_existing_button.clicked.connect(self.overwrite_files)
-        self.dont_overwrite_button.clicked.connect(self.dont_overwrite_files)
-        self.choose_output_button.clicked.connect(self.choose_where_output)
-        self.about_button.clicked.connect(self.about_clicked)
-        self.help_button.clicked.connect(self.help_clicked)
+            "video_bitrate":        ["LineEdit", "",                                    "Left", "YE_HIDE", (3, 1, 1, 2)],
+            "input_text":           ["LineEdit", "",                                    "Left", "YE_HIDE", (1, 1, 1, 2)],
+            "input_file":           ["ToolButton", ". . .",                             "Left", "YE_HIDE", (1, 3, 1, 1)],
+            "help_button":          ["ToolButton", "  ?  ",                            "Right", "YE_HIDE", (1, 4, 1, 1)],
+            "output_text_input":    ["LineEdit", "",                                    "Left", "YE_HIDE", (2, 1, 1, 2)],
+            "output_ext":           ["ComboBox",                                        "Left", "YE_HIDE", (2, 3, 1, 2)],
+            "audio_which":          ["ComboBox",                                        "Left", "YE_HIDE", (4, 3, 1, 2)],
+            "audio_bitrate_slider": ["Slider",                            "Horizontal", "Left", "YE_HIDE", (4, 1, 1, 2)],
+            "audio_bitrate_input":  ["LineEdit", "",                                    "Left", "YE_HIDE", (4, 1, 1, 2)],
+            "threads":              ["Slider",                            "Horizontal", "Left", "YE_HIDE", (5, 1, 1, 2)],
+            "speed":                ["ComboBox",                                        "Left", "YE_HIDE", (6, 1, 1, 2)],
+        }
+        widget_buttons = {
+            "start_button":         ["PushButton", "Start",                             "Left", "NO_HIDE", (8, 0, 1, 5)],
+            "stop_button":          ["PushButton", "Stop",                              "Left", "NO_HIDE", (8, 0, 1, 5)],
+            "continue_button":      ["PushButton", "Yes",                               "Left", "NO_HIDE", (8, 0, 1, 3)],
+            "cancel_button":        ["PushButton", "Cancel",                            "Left", "NO_HIDE", (8, 3, 1, 2)],
+        }
+        widget_combined = {**widget_layout, **widget_buttons}
 
-    class AboutProgram(QtWidgets.QDialog): #Information about the program
-        def __init__(self):
-            super().__init__()
+        widget_boxes = {
+            "audio_bitrate_slider": [1, 8, 0.75],
+            "threads":              [1, os.cpu_count(), 0.75],
+            "speed": ["veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "ultrafast"],
+            "output_ext": ["mp4", "mkv", "avi", "ts", "png"],
+            "audio_which": ["copy", "slider", "input"],
+        }
 
-            self.setWindowTitle("About Program")
-            self.about_dialog = QtWidgets.QLabel("TurnH264 is licensed under the Helium License",
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.about_copyright = QtWidgets.QLabel("TurnH264 is © 2022 craftnut and contributors",
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.about_ffmpeg = QtWidgets.QLabel("FFmpeg is licensed under the GNU GPL license",
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.with_love = QtWidgets.QLabel("Made with <3 by craftnut",
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.github_repository = QtWidgets.QLabel('''<a href='https://github.com/craftnut/TurnH264'>View the source code on GitHub</a>''',
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.github_repository.setOpenExternalLinks(True)
+        def parse_layout(widgetDict):
+            self.layout = QtWidgets.QGridLayout(self)
 
-            self.layout = QtWidgets.QVBoxLayout(self)
-            self.layout.addWidget(self.about_dialog)
-            self.layout.addWidget(self.about_copyright)
-            self.layout.addWidget(self.about_ffmpeg)
-            self.layout.addWidget(self.with_love)
-            self.layout.addWidget(self.github_repository)
+            for key in widgetDict:
+                layout = widgetDict[key][-1]
+                val = widgetDict[key]
+                given = "self."+key
+                exec(f"{given} = QtWidgets.Q{val[0]}()")
+                if val[0] in ["Label", "PushButton", "ToolButton"]:  # text
+                    exec(f"{given}.setText('{val[1]}')")
+                if val[0] in ["Label", "LineEdit"]:  # alignment
+                    exec(f"{given}.setAlignment(Qt.Align{val[2]})")
+                if val[0] == "ComboBox":  # box items
+                    exec(f"{given}.addItems({widget_boxes[key]})")
+                if val[0] == "Slider":  # sliders
+                    exec(
+                        f"{given}.setRange({widget_boxes[key][0]}, {widget_boxes[key][1]})")
+                    exec(
+                        f"{given}.setValue({widget_boxes[key][1]*widget_boxes[key][2]})")
+                    exec(f"{given}.setOrientation(Qt.Orientation.{val[-4]})")
+                # apply layout
+                exec(f"self.layout.addWidget({given}, {layout[0]}, \
+                      {layout[1]}, {layout[2]}, {layout[3]})")
 
-    class HelpWindow(QtWidgets.QDialog): #Help window
-        def __init__(self):
-            super().__init__()
+        parse_layout(widget_combined)
+        timer.print("Widgets added")
+        # exit()
+        self.hide_show_widgets(1, 0, 0)
+        # if input_text changed, update output_text_input
+        self.input_text.textChanged.connect(self.input_text_changed)
+        self.input_file.clicked.connect(self.input_file_select_clicked)
+        self.output_ext.currentTextChanged.connect(self.output_box_changed)
+        self.audio_which.currentTextChanged.connect(self.audio_box_changed)
+        self.threads.valueChanged.connect(self.slider_changed)
+        self.start_button.clicked.connect(self.start_button_clicked)
+        self.stop_button.clicked.connect(self.stop_button_clicked)
+        self.continue_button.clicked.connect(self.overwrite_button_clicked)
+        self.cancel_button.clicked.connect(self.cancel_button_clicked)
+        self.audio_bitrate_input.setToolTip("non-numbers will be stripped.")
+        self.video_bitrate.setToolTip("non-numbers will be stripped.")
+        self.v_bitrate_dialog_2.setToolTip("1 mb = 1000 kb")
+        self.audio_bitrate_input.hide()
+        self.audio_bitrate_slider.hide()
 
-            self.setWindowTitle("Help")
-            self.help_output = QtWidgets.QLabel("If you didn't select an output, check the directory for output.mp4",
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.help_bitrate = QtWidgets.QLabel("1000k in KBPS is equivelent to 1 MBPS.",
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.program_wont_work = QtWidgets.QLabel("Program not working? Put an FFmpeg executable in the same directory.",
-                                                alignment=QtCore.Qt.AlignCenter)
-            self.found_bug = QtWidgets.QLabel("Found a bug? Report it on the GitHub page.",
-                                                alignment=QtCore.Qt.AlignCenter)
+    def reset_dialog(self):
+        self.status_dialog.setText(widget_layout["status_dialog"][1])
+        for key in widget_buttons:
+            exec(f"self.{key}.setText('{widget_buttons[key][1]}')")
 
-            self.layout = QtWidgets.QVBoxLayout(self)
-            self.layout.addWidget(self.help_output)
-            self.layout.addWidget(self.help_bitrate)
-            self.layout.addWidget(self.program_wont_work)
-            self.layout.addWidget(self.found_bug)
-
-    class FinishDialog(QtWidgets.QDialog): #Dialog when your process finishes
-        def __init__(self):
-            super().__init__()
-
-            self.setWindowTitle("Finished")
-            self.finish_dialog = QtWidgets.QLabel("Your file is done processing, check for output file.")
-            self.acknowledged_finish = QtWidgets.QPushButton("Ok")
-            self.layout = QtWidgets.QVBoxLayout(self)
-            self.layout.addWidget(self.finish_dialog)
-
-    class NoFileDialog(QtWidgets.QDialog): #Warn the user about a lack of input file
-        def __init__(self):
-            super().__init__()
-
-            self.setWindowTitle("Error")
-            self.no_file_dialog = QtWidgets.QLabel("Please select a file.")
-            self.acknowledge_lack_of_file = QtWidgets.QPushButton("Ok")
-            self.layout = QtWidgets.QVBoxLayout(self)
-            self.layout.addWidget(self.no_file_dialog)
-            self.layout.addWidget(self.acknowledge_lack_of_file)
-
-            self.acknowledge_lack_of_file.clicked.connect(self.close)
-
-    class FileSelection(QtWidgets.QFileDialog): #Selection box for input file
-            def __init__(self):
-                super().__init__()
-
-                self.setWindowTitle("Choose a file")
-
-    class OutputFileSelection(QtWidgets.QFileDialog): #Selection box for output file
-            def __init__(self):
-                super().__init__()
-
-                self.setWindowTitle("Where to save file?")
-
-    @QtCore.Slot()
-
-    def about_clicked(self): #Open information window
-        about_box = MainWindow.AboutProgram()
-        about_box.resize(300,150)
-        about_box.exec()
-
-    def help_clicked(self):
-        help_box = MainWindow.HelpWindow()
-        help_box.resize(300,150)
-        help_box.exec()
-
-    def choose_file(self): #Choose input file
-        ffmpeg_input_file = MainWindow.FileSelection.getOpenFileName(self, 'Select a video file', os.path.expanduser("~"), 'Video files (*.mp4 *.mkv *.avi *.flv *.mov *webm)')
-
-        self.input_file.setText(str(ffmpeg_input_file[0]))
-
-    def choose_where_output(self): #Choose output file
-        ffmpeg_output_file = MainWindow.OutputFileSelection.getSaveFileName(self, 'Select a video file', os.path.expanduser("~"), 'Video files (*.mp4 *.mkv *.mov)')
-
-        self.output_file.setText(str(ffmpeg_output_file[0]))
-
-    def threads_slider_updated(self): #CPU threads slider
-        self.thread_dialog.setText(f"Select the number of CPU threads to use: {self.threads.value()} / {thread_count}")
-        self.thread_dialog.update()
-
-    def audio_slider_updated(self): #Audio bitrate slider
-        self.audio_bitrate_dialog.setText(f"Select the audio bitrate: {self.audio_bitrate.value()*32}")
-        self.audio_bitrate_dialog.update()
-
-    def go_button_clicked(self): #User clicked go
-        
-        ffmpeg_output_file = self.output_file.text()
-        no_file_box = MainWindow.NoFileDialog()
-        no_file_box.resize(200,120)
-
-        if self.input_file.text() == "":
-            no_file_box.exec()
-
-        if os.path.exists(str(ffmpeg_output_file)):
-            self.overwrite_existing_button.show()
-            self.dont_overwrite_button.show()
-            self.go_button.hide()
-
+    def input_text_changed(self):
+        if self.input_text.text() == "":
+            self.output_text_input.setText("")
         else:
-            self.run_ffmpeg()
+            self.output_text_input.setText("%Input_Path%/"+(self.input_text.text()).split(
+                "/")[-1].split(".")[0]+"-converted."+self.output_ext.currentText())
 
-    def overwrite_files(self): #User wants to overwrite existing file
-        self.overwrite_existing_button.hide()
-        self.dont_overwrite_button.hide()
-        self.go_button.show()
+    def input_file_select_clicked(self):
+        if sys.platform == "win32":
+            self.input_text.setText(QtWidgets.QFileDialog.getOpenFileName(
+                self, "Select input file", "c:\\users\\")[0])
+        else:
+            file = QtWidgets.QFileDialog.getOpenFileName(
+                self, "Select a video file", os.path.expanduser("~"))
+            self.input_text.setText(file[0])
+        print("selected"+self.input_text.text())
+
+    def hide_show_widgets(self, inst_start, int_stop, int_que):
+        self.start_button.setHidden(not bool(inst_start))
+        self.stop_button.setHidden(not bool(int_stop))
+        self.continue_button.setHidden(not bool(int_que))
+        self.cancel_button.setHidden(not bool(int_que))
+
+    def output_box_changed(self):
+        extension = "."+self.output_ext.currentText()
+        if self.output_ext.currentText() == "png":
+            extension = "/%06d.png"
+        self.output_text_input.setText("%Input_Path%/"+(self.input_text.text()).split(
+            "/")[-1].split(".")[0]+"-converted"+extension)
+
+    def audio_box_changed(self):
+        audio_dict = {"copy": [True, True], "slider": [False, True],
+                      "input": [True, False]}
+        for i in audio_dict:
+            if self.audio_which.currentText() == i:
+                self.audio_bitrate_input.setVisible(audio_dict[i][0])
+                self.audio_bitrate_slider.setVisible(audio_dict[i][1])
+
+    def slider_changed(self):
+        self.threads_dialog_ratio.setText(
+            f"{str(self.threads.value()).zfill(len(str(os.cpu_count())))} / {os.cpu_count()}")
+        self.threads_dialog_ratio.update()
+
+    def enable_disable_widgets(self, inint):
+        '''inint = 0: disable, inint = 1: enable'''
+        for i in widget_layout:
+            if widget_layout[i][-2] == "YE_HIDE":
+                exec(f"self.{i}.setEnabled(bool({inint}))")
+
+    def modify_status(self, text):
+        self.status_dialog.setText(text)
+        self.status_dialog.update()
+
+    def get_output_file(self):
+        return self.output_text_input.text().replace("%Input_Path%", os.path.dirname(self.input_text.text()))
+
+    def start_button_clicked(self):
+        self.input = self.input_text.text()
+        if not os.path.exists(self.input):
+            self.status_dialog.setText("Input file does not exist.")
+            self.status_dialog.update()
+            return
+        ffmpeg_output = self.get_output_file()
+        if os.path.exists(ffmpeg_output):
+            print(ffmpeg_output, "already exists.")
+            self.status_dialog.setText("Output already exists, overwrite?")
+            self.hide_show_widgets(0, 0, 1)
+            self.enable_disable_widgets(False)
+            # self.overwrite_button_clicked()
+        else:
+            print("output does not exist.")
+            self.overwrite_button_clicked()
+
+    def overwrite_button_clicked(self):
+        self.hide_show_widgets(1, 1, 0)
+        self.modify_status("Converting...")
+        self.enable_disable_widgets(0)
         self.run_ffmpeg()
 
-    def dont_overwrite_files(self): #User does NOT want to overwrite existing file
-        self.overwrite_existing_button.hide()
-        self.dont_overwrite_button.hide()
-        self.go_button.show()
+    def cancel_button_clicked(self):
+        self.reset_dialog()
+        self.hide_show_widgets(1, 0, 0)
+        self.enable_disable_widgets(1)
 
-    def run_ffmpeg(self): #FFmpeg pre-run and commands
+    def stop_button_clicked(self):
+        self.hide_show_widgets(1, 0, 0)
+        self.enable_disable_widgets(0)
+        self.modify_status("Conversion stopped. delete unfinished video?")
+        self.hide_show_widgets(0, 0, 1)
+        self.continue_button.setText("Yes")
+        self.cancel_button.setText("No")
+        self.continue_button.clicked.disconnect()
+        self.continue_button.clicked.connect(self.delete_mp4)
 
-        ffmpeg_input_file = self.input_file.text()
-        ffmpeg_output_file = self.output_file.text()
-        ffmpeg_bitrate = self.bitrate.text()
-        ffmpeg_audio_bitrate = str(int(self.audio_bitrate.value()*32))+'k'
-        ffmpeg_threading = self.threads.value()
-        ffmpeg_audio_codec = self.audio_codec.currentIndex()
-        audio_codecs = ["aac", "libopus"]
-        ffmpeg_audio_codec = audio_codecs[ffmpeg_audio_codec]
-        finish_box = MainWindow.FinishDialog()
-        finish_box.resize(160,80)
+    def delete_mp4(self):
+        if not self.output_text_input.text().split("/")[0] == "%Input_Path%":
+            ffmpeg_output = self.output_text_input.text()
+        else:
+            ffmpeg_output = os.path.dirname(self.input_text.text()) \
+                + "/" + self.output_text_input.text().split("/")[-1]
+        if os.path.exists(ffmpeg_output):
+            os.remove(ffmpeg_output)
+            print(f"removed {self.output_text_input.text()}")
+        self.enable_disable_widgets(1)
+        self.continue_button.clicked.disconnect()
+        self.continue_button.clicked.connect(self.overwrite_button_clicked)
+        self.cancel_button_clicked()
 
-        self.input_dialog.setText("Please wait before sending another process...")
-        self.bitrate_dialog.setText("Please wait before sending another process...")
-        self.cancel_button.show()
-        self.go_button.hide()
-        ffmpeg_run = subprocess.Popen ([
-            './ffmpeg', '-y', # if you would like to use your PATH's FFmpeg, remove the "./" from "./ffmpeg"
-            '-i', ffmpeg_input_file,
-            '-c:v', 'libx264', '-b:v', str(ffmpeg_bitrate) if str(ffmpeg_bitrate) else '1000k',
-            '-c:a', str(ffmpeg_audio_codec),
-            '-b:a', str(ffmpeg_audio_bitrate),
-            '-vbr', 'off',
-            '-threads', str(ffmpeg_threading) if str(ffmpeg_threading) else '4',
-            #'-progress', '-', '-nostats',
-            ffmpeg_output_file
-            ])      
+    def run_ffmpeg(self):
+        timer.reset()
+        ffmpeg_input_file = self.input_text.text()
+        ffmpeg_video_bitrate = "".join(
+            [val for val in self.video_bitrate.text() if val.isnumeric()]) + "k"
+        ffmpeg_audio_bitrate = ""
+        if self.audio_which.currentText() == "slider":
+            ffmpeg_audio_bitrate = str(
+                self.audio_bitrate_slider.value()*32) + "k"
+        elif self.audio_which.currentText() == "input":
+            ffmpeg_audio_bitrate = str(self.audio_bitrate_input.text()) + "k"
 
-        def ffmpeg_wait(): #Wait for FFmpeg, before running what shows after
+        ffmpeg_output = self.get_output_file()
+        if self.output_ext.currentText() == "png":
+            if not os.path.exists(os.path.dirname(ffmpeg_output)):
+                os.makedirs(os.path.dirname(ffmpeg_output))
+        local_ffmpeg = os.path.dirname(os.path.realpath(__file__)) + "/ffmpeg"
+        ffmpeg_path = local_ffmpeg if os.path.exists(
+            local_ffmpeg) else "ffmpeg"
+        print("using:", ffmpeg_path)
+        command = [ffmpeg_path]  # get ffmpeg path
+        command.extend(['-y'])
+        command.extend(['-i', ffmpeg_input_file])
+        command.extend(['-threads', str(self.threads.value())])
+        command.extend(['-preset', self.speed.currentText()])
+        if self.output_ext.currentText() != "png":
+            command.extend(['-c:v', 'libx264'])
+            command.extend(['-b:v', ffmpeg_video_bitrate]
+                           if self.video_bitrate.text() != "" else ["-q:v", "0"])
+            command.extend(
+                ['-c:a', 'copy'] if self.audio_which.currentText() == "copy" else ["aac"])
+            command.extend(['-b:a', ffmpeg_audio_bitrate]
+                           if ffmpeg_audio_bitrate != "" else ["-q:a", "0"])
+            command.extend(['-map', '0:v:?', '-map', '0:a:?'])
+        command.extend([ffmpeg_output])
+        print(command)
+        # run ffmpeg in a separate thread
+        ffmpeg_thread_main = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        timer.print("ffmpeg initalized")
 
-            self.ffmpeg_running = True
-            ffmpeg_run.wait()
+        def kill_function():
+            print("killing ffmpeg")
+            if sys.platform == "win32":  # windows doesn't use SIGINT for some reason
+                while ffmpeg_thread_main.poll() is None:
+                    os.kill(ffmpeg_thread_main.pid, signal.CTRL_C_EVENT)
+                    time.sleep(3)
+            else:
+                while ffmpeg_thread_main.poll() is None:
+                    ffmpeg_thread_main.send_signal(signal.SIGINT)
+                    time.sleep(2.8)
+            print("\nkilled ffmpeg")
 
-            self.ffmpeg_running = False
-            finish_box.exec()
-            self.input_dialog.setText("Input the path to the video:")
-            self.bitrate_dialog.setText("Input the bitrate in kilobits per second in thousands, like \"1000k\":")
-            self.cancel_button.hide()
-            self.go_button.show()
-            self.finish_dialog.setText("Your file is done processing, check for output file.")
+        def ffmpeg_waiting():
+            print("waiting for ffmpeg to finish")
+            errors = ffmpeg_thread_main.communicate()
+            ffmpeg_thread_main.wait()
+            if ffmpeg_thread_main.returncode != 0:
+                if not self.continue_button.isVisible():
+                    print("ffmpeg failed")
+                    self.hide_show_widgets(1, 0, 0)
+                    self.enable_disable_widgets(1)
+                    errors = "\n".join(
+                        errors[-1].decode("utf-8").rsplit("\n", 4)[-3:])
+                    self.resize(self.width()+50, self.height())
+                    self.status_dialog.setText(str(errors))
+                    print(errors)
+                    # if errors contains "invalid argument",
+                    if "invalid argument" in errors[-1]:
+                        self.status_dialog.setText(
+                            "Invalid argument, Please check your input.")
+                    return errors
+            print("\nffmpeg finished")
+            if not self.continue_button.isVisible():
+                self.status_dialog.setText("Conversion complete!")
+                self.hide_show_widgets(1, 0, 0)
+                self.enable_disable_widgets(1)
 
-        def ffmpeg_terminate(): #Kill FFmpeg early
-            if sys.platform == "win32": #kill on win32
-                while ffmpeg_run.poll() is None:
-                    ffmpeg_run.kill()
-                    self.finish_dialog.setText("FFmpeg process canceled, deleting unfished files.")
-                    time.sleep(5)
-                    ffmpeg_killed = True
+        self.stop_button.clicked.connect(kill_function)
+        ffmpeg_thread_wait = threading.Thread(target=ffmpeg_waiting)
+        ffmpeg_thread_wait.start()
 
-            elif sys.platform == "linux" or "darwin": #kill on unix
-                while ffmpeg_run.poll() is None:
-                    ffmpeg_run.send_signal(signal.SIGINT)
-                    self.finish_dialog.setText("FFmpeg process canceled, deleting unfished files.")
-                    time.sleep(5)
-                    ffmpeg_killed = True
 
-            if ffmpeg_killed == True: #remove unfished files
-                os.remove(ffmpeg_output_file)
-                ffmpeg_killed = False
-
-        self.cancel_button.clicked.connect(ffmpeg_terminate)
-        wait_on_ffmpeg = threading.Thread(target=ffmpeg_wait)
-        wait_on_ffmpeg.start()
-
-if __name__ == "__main__": #Launch the main-window on run
+if __name__ == "__main__":
     app = QtWidgets.QApplication([])
-
     main_app_window = MainWindow()
-    main_app_window.resize(380, 240)
     main_app_window.show()
-
     sys.exit(app.exec())

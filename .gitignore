@@ -1,4 +1,5 @@
-
-ffmpeg
-# dont pay attention to this one xd
 test_pygame.py
+build/
+dist/
+# dont pay attention to this one xd
+ffmpeg

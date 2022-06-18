@@ -1,13 +1,14 @@
 # To H264
 
-## A simple GUI program that converts a video into H264 using FFmpeg. When in doubt, turn to H264.
+## A simple GUI program that converts a video into H264 using FFmpeg. 
+##### When in doubt, turn to H264.
 ---
 ### How to run the executable (Windows):
 Download the package from releases
 Place `ffmpeg.exe` alongside `TurnH264.exe` or `TurnH264.py`
 FFmpeg builds are available at https://www.ffmpeg.org/download.html
 
----
+
 ### How to run from source (Linux):
   
   Install PySide6: `pip install PySide6`

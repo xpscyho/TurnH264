@@ -3,3 +3,5 @@ build/
 dist/
 # dont pay attention to this one xd
 ffmpeg
+TurnH264.spec
+.spec

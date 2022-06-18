@@ -19,7 +19,7 @@ Please do note that this program is untested for macOS as neither me nor any of 
 
 ## Compilation:
 
-Simple: run `python compile.py`
+Simple: run `python compile.py` ( + `--onefile` if desired )
 
 otherwise:
 

@@ -271,7 +271,7 @@ class MainWindow(QtWidgets.QWidget):
             command.extend(['-b:v', ffmpeg_video_bitrate]
                            if self.video_bitrate.text() != "" else ["-q:v", "0"])
             command.extend(
-                ['-c:a', 'copy'] if self.audio_which.currentText() == "copy" else ["aac"])
+                ['-c:a', 'copy'] if self.audio_which.currentText() == "copy" else ['-c:a', 'aac'])
             command.extend(['-b:a', ffmpeg_audio_bitrate]
                            if ffmpeg_audio_bitrate != "" else ["-q:a", "0"])
             command.extend(['-map', '0:v:?', '-map', '0:a:?'])

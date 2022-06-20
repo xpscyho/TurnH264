@@ -28,8 +28,9 @@ otherwise:
   pip install pyinstaller pyside6
   pyinstaller TurnH264.py
 ```
+---
 
-Todo:
+### Todo:
 
 -   [ ] Add a progress bar
 -   [ ] NVENC and VCE

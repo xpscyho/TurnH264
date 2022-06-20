@@ -1,8 +1,8 @@
-test_pygame.py
 build/
 dist/
 TurnH264-build/
-# dont pay attention to this one xd
 ffmpeg
 TurnH264.spec
 .spec
+# dont pay attention to this one xd
+*pygame*

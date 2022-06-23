@@ -18,6 +18,8 @@ Please do note that this program is untested for macOS as neither me nor any of 
 ---
 
 ## Compilation:
+**DISCLAIMER: compilation is absolutely unnecessary to run this program.**
+
 These commands must run on the OS that you want to compile for.
 
 Simple: run `python compile.py`
@@ -32,7 +34,7 @@ otherwise:
 
 ### Todo:
 
--   [ ] Add a progress bar
+-   [x] Add a progress bar
 -   [ ] NVENC and VCE
 -   [ ] automatically install ffmpeg if not detected
 

@@ -5,8 +5,8 @@ import sys
 import threading
 import time
 
-# these are used, but run in exec so they are shown as unused
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
+# this is used, but run in exec so they are shown as unused (at least in MY IDE)
 from PySide6.QtCore import Qt
 
 
@@ -15,7 +15,7 @@ class timer:  # timer setup ####
         '''start the timer'''
         timer.timer_start_time = time.time()
 
-    def print(instr):
+    def print(instr, end='\n'):
         '''print and restart the timer'''
         if timer.timer_start_time is None:
             timer.start()
@@ -24,13 +24,13 @@ class timer:  # timer setup ####
         now = time.time()
         diff = (now - timer.timer_start_time) * 1000
         timer.timer_start_time = now
-        print(f"{instr}: ms{diff:.4f}")
+        print(f"{instr}: ms{diff:.4f}", end=end)
         return diff
 
-    def poll(instr):
+    def poll(instr, end='\n'):
         '''print without restarting the timer'''
         now = time.time()
-        print(f"{instr}: ms{(now - timer.timer_start_time) * 1000:.4f}")
+        print(f"{instr}: ms{(now - timer.timer_start_time) * 1000:.4f}", end=end)
 
     def reset():
         '''restart the timer'''
@@ -84,7 +84,7 @@ class MainWindow(QtWidgets.QWidget):
         super(MainWindow, self).__init__()
         timer.print("Starting")
         self.setWindowTitle("TurnH264")
-        self.resize(320, 260)
+        self.resize(320, 300)
         self.setMinimumSize(320, 260)
         self.addWidgets()
         self.stopped_preemptively = False
@@ -129,7 +129,6 @@ class MainWindow(QtWidgets.QWidget):
         self.inputChanged()
         self.audioDropChanged()
         self.threadChanged()
-    # def addButtons(self):
 
     def changeButtons(self, num):
         '''0 = Start, 1 = Stop, 2 = Yes/No dialog'''
@@ -197,6 +196,15 @@ class MainWindow(QtWidgets.QWidget):
             return
         self.startFfmpeg()
 
+    def byteFormat(self, size, suffix="B"):
+        '''modified version of: https://stackoverflow.com/a/1094933'''
+        size = int(size)
+        for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti']:
+            if abs(size) < 2**10:
+                return f"{size:3.1f}{unit}{suffix}"
+            size /= 2**10
+        return f"{size:3.1f}{unit}{suffix}"
+
     def startFfmpeg(self):
         timer.reset()
         local_ffmpeg = os.path.dirname(os.path.realpath(__file__)) + "/ffmpeg"
@@ -213,9 +221,15 @@ class MainWindow(QtWidgets.QWidget):
             "speed": self.speed.currentText(),
             "fps": "".join([val for val in self.fps.text() if val.isnumeric()])
         }
+        tmpdir = os.path.dirname(os.path.realpath(__file__)) + "/.TurnH264.tmp"
+        if os.path.exists(tmpdir):
+            os.remove(tmpdir)
+        tmpfile = open(tmpdir, "w")
+
         command = sum([[ffargs['path'], '-y'],
                        ['-i', ffargs['input'], '-c:v', 'libx264'],
                        ['-threads', ffargs['threads']],
+                       ['-preset', ffargs['speed']],
                        ['-b:v', ffargs['vidbr'] + "k"] if vindex == 0 and ffargs['vidbr'] != "" else
                        ['-crf', ffargs['vidbr']] if vindex == 1 else
                        ['-q:v', ffargs['vidbr'] if ffargs['vidbr'] != "" else "0"],
@@ -225,9 +239,10 @@ class MainWindow(QtWidgets.QWidget):
                        ['-an'] if aindex == 3 else [],
                        ['-r', ffargs['fps']] if ffargs['fps'] != "" else [],
                        ['-map', '0:v:?', '-map', '0:a:?'],
+                       ['-progress', '-', '-nostats'],
                        [ffargs['output']]], [])
         ffmpegThread = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            command, stdout=tmpfile, stderr=tmpfile)
         timer.print("ffmpeg initialized")
 
         def ffmpegCancel():
@@ -241,12 +256,10 @@ class MainWindow(QtWidgets.QWidget):
                     ffmpegThread.send_signal(signal.SIGINT)
                     time.sleep(2.8)
             timer.print("\nkilled ffmpeg")
-            self.work_button.clicked.disconnect()
-            self.work_button.clicked.connect(self.workClicked)
+            self.stopped_preemptively = True
             self.status_dialog.setText(
                 "Conversion stopped. delete unfinished video?")
             self.changeButtons(2)
-            self.stopped_preemptively = True
 
         def ffmpegWait():
             errors = ffmpegThread.communicate()
@@ -266,12 +279,50 @@ class MainWindow(QtWidgets.QWidget):
             self.changeButtons(0)
             self.WidgetsEditable(1)
             timer.print("\nffmpeg finished")
+            self.stopped_preemptively = False
+            os.remove(tmpdir)
+
+        def ffmpegWatch():
+            time.sleep(2)  # so the lastline stuff doesnt get tripped
+            # ffprobe -v error -select_streams v:0 -count_packets -show_entries stream=nb_read_packets -of csv=p=0 input.mp4
+            video_frame = subprocess.Popen([
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-count_packets", "-show_entries", "stream=nb_read_packets",
+                "-of", "csv=p=0", self.input_text.text()], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            video_frame_total = video_frame.stdout.read().strip().decode("utf-8")
+            print("\n\n")
+            while os.path.exists(tmpdir):
+                file = open(tmpdir, "r")
+                lines = file.readlines()
+                if len(lines) > 0:
+                    last_line = [i.strip().split("=") for i in lines[-12:]]
+                    try:
+                        line_dict = {data[0]: data[1] for data in last_line}
+                    except:
+                        continue
+                    used_list = [
+                        "frame: "+line_dict['frame']+" / "+video_frame_total,
+                        line_dict['fps']+" fps", str(round(
+                            (int(line_dict['frame'])
+                             / int(video_frame_total))*100, 2))+"%",
+                        "\nbitrate: "+line_dict['bitrate'],
+                        "size: " + self.byteFormat(line_dict['total_size']),
+                        "\nspeed: "+line_dict['speed']
+                    ]
+                    timer.poll(("\033[A\r\033[K"*3)+", ".join(used_list))
+                    self.status_dialog.setText(", ".join(used_list))
+                file.close()
+                time.sleep(0.5)
+
         self.status_dialog.setText("Converting...")
         self.changeButtons(1)
         self.WidgetsEditable(0)
         self.work_button.clicked.disconnect()
         self.work_button.clicked.connect(ffmpegCancel)
+
         self.ffmpegWaitThread = threading.Thread(target=ffmpegWait)
+        self.ffmpegWatchThread = threading.Thread(target=ffmpegWatch)
+        self.ffmpegWatchThread.start()
         self.ffmpegWaitThread.start()
 
     def workClicked(self):

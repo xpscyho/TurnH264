@@ -4,5 +4,6 @@ TurnH264-build/
 ffmpeg
 TurnH264.spec
 .spec
+TurnH264-2.py
 # dont pay attention to this one xd
 *pygame*

@@ -12,9 +12,11 @@ from PySide6.QtCore import Qt
 
 class timer:  # timer setup ####
     def start():
+        '''start the timer'''
         timer.timer_start_time = time.time()
 
     def print(instr):
+        '''print and restart the timer'''
         if timer.timer_start_time is None:
             timer.start()
             print("Started timer")
@@ -25,11 +27,56 @@ class timer:  # timer setup ####
         print(f"{instr}: ms{diff:.4f}")
         return diff
 
+    def poll(instr):
+        '''print without restarting the timer'''
+        now = time.time()
+        print(f"{instr}: ms{(now - timer.timer_start_time) * 1000:.4f}")
+
     def reset():
+        '''restart the timer'''
         timer.timer_start_time = time.time()
 
 
 timer.reset()
+widget_layout = {
+    "input_dialog":         ["Label", "Input video:",   "Center", "YE_HIDE", (1, 0, 1, 1)],
+    "input_text":           ["LineEdit",                  "Left", "YE_HIDE", (1, 1, 1, 2)],
+    "input_button":         ["ToolButton", ". . .",       "Left", "YE_HIDE", (1, 3, 1, 1)],
+    "help_button":          ["ToolButton", "  ?  ",      "Right", "YE_HIDE", (1, 4, 1, 1)],
+    "output_dialog":        ["Label", "Output:",        "Center", "YE_HIDE", (2, 0, 1, 1)],
+    "output_text_input":    ["LineEdit",                  "Left", "YE_HIDE", (2, 1, 1, 2)],
+    "outputDrop":           ["ComboBox",                  "Left", "YE_HIDE", (2, 3, 1, 2)],
+
+    "v_bitrate_dialog":     ["Label", "Video bitrate:", "Center", "YE_HIDE", (3, 0, 1, 1)],
+    "video_bitrate":        ["LineEdit",                  "Left", "YE_HIDE", (3, 1, 1, 2)],
+    "videoDrop":            ["ComboBox",                  "Left", "YE_HIDE", (3, 3, 1, 2)],
+    "a_bitrate_dialog":     ["Label", "Audio bitrate:", "Center", "YE_HIDE", (4, 0, 1, 1)],
+    "audio_bitrate_slider": ["Slider",      "Horizontal", "Left", "YE_HIDE", (4, 1, 1, 2)],
+    "audio_bitrate_input":  ["LineEdit",                  "Left", "YE_HIDE", (4, 1, 1, 2)],
+    "audioDrop":            ["ComboBox",                  "Left", "YE_HIDE", (4, 3, 1, 2)],
+    "threads_dialog":       ["Label", "Threads:",       "Center", "YE_HIDE", (5, 0, 1, 1)],
+    "thread":               ["Slider",      "Horizontal", "Left", "YE_HIDE", (5, 1, 1, 2)],
+    "threads_dialog_ratio": ["Label", "",               "Center", "YE_HIDE", (5, 3, 1, 2)],
+    "speed_dialog":         ["Label", "Speed:",         "Center", "YE_HIDE", (6, 0, 1, 1)],
+    "speed":                ["ComboBox",                  "Left", "YE_HIDE", (6, 1, 1, 2)],
+    "fps_dialog":           ["Label", "fps:",           "Center", "YE_HIDE", (7, 0, 1, 1)],
+    "fps":                  ["LineEdit",                  "Left", "YE_HIDE", (7, 1, 1, 2)],
+
+    "status_dialog":        ["Label", "Awaiting input", "Center", "NO_HIDE", (8, 0, 1, 5)],
+    "work_button":          ["PushButton", "Start",       "Left", "NO_HIDE", (9, 0, 1, 5)],
+    "yes_button":           ["PushButton", "Continue",    "Left", "NO_HIDE", (9, 0, 1, 3)],
+    "no_button":            ["PushButton", "Cancel",      "Left", "NO_HIDE", (9, 3, 1, 2)]
+}
+widget_boxes = {
+    "audio_bitrate_slider": [1, 8, 0.75],
+    "thread":               [1, os.cpu_count(), 0.75],
+    "speed":                ["veryslow", "slower", "slow",
+                             "medium",   "fast",   "faster",
+                             "veryfast", "ultrafast"],
+    "outputDrop":           ["mp4", "mkv", "avi", "ts", "png"],
+    "videoDrop":            ["kb/s", "crf", "q:v"],
+    "audioDrop":            ["copy", "slider", "input", "none"],
+}
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -39,289 +86,211 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("TurnH264")
         self.resize(320, 260)
         self.setMinimumSize(320, 260)
-        # force column 0 to fit content
-        self.addwidgets()
-        self.slider_changed()  # to update ratio
+        self.addWidgets()
+        self.stopped_preemptively = False
 
-    def addwidgets(self):
-        global widget_layout, widget_buttons, widget_boxes
-        widget_layout = {
-            "input_dialog":         ["Label", "Input video:",                         "Center", "YE_HIDE", (1, 0, 1, 1)],
-            "output_dialog":        ["Label", "Output:",                              "Center", "YE_HIDE", (2, 0, 1, 1)],
-            "v_bitrate_dialog_1":   ["Label", "Video bitrate:",                       "Center", "YE_HIDE", (3, 0, 1, 1)],
-            "v_bitrate_dialog_2":   ["Label", "kb/s",                                 "Center", "YE_HIDE", (3, 3, 1, 2)],
-            "a_bitrate_dialog_1":   ["Label", "Audio bitrate:",                       "Center", "YE_HIDE", (4, 0, 1, 1)],
-            "threads_dialog":       ["Label", "Threads:",                             "Center", "YE_HIDE", (5, 0, 1, 1)],
-            "threads_dialog_ratio": ["Label", "",                                     "Center", "YE_HIDE", (5, 3, 1, 2)],
-            "speed_dialog":         ["Label", "Speed:",                               "Center", "YE_HIDE", (6, 0, 1, 1)],
-            "status_dialog":        ["Label", "Awaiting input",                       "Center", "NO_HIDE", (7, 0, 1, 5)],
+    def addWidgets(self):
+        timer.reset()
 
-            "video_bitrate":        ["LineEdit", "",                                    "Left", "YE_HIDE", (3, 1, 1, 2)],
-            "input_text":           ["LineEdit", "",                                    "Left", "YE_HIDE", (1, 1, 1, 2)],
-            "input_file":           ["ToolButton", ". . .",                             "Left", "YE_HIDE", (1, 3, 1, 1)],
-            "help_button":          ["ToolButton", "  ?  ",                            "Right", "YE_HIDE", (1, 4, 1, 1)],
-            "output_text_input":    ["LineEdit", "",                                    "Left", "YE_HIDE", (2, 1, 1, 2)],
-            "output_ext":           ["ComboBox",                                        "Left", "YE_HIDE", (2, 3, 1, 2)],
-            "audio_which":          ["ComboBox",                                        "Left", "YE_HIDE", (4, 3, 1, 2)],
-            "audio_bitrate_slider": ["Slider",                            "Horizontal", "Left", "YE_HIDE", (4, 1, 1, 2)],
-            "audio_bitrate_input":  ["LineEdit", "",                                    "Left", "YE_HIDE", (4, 1, 1, 2)],
-            "threads":              ["Slider",                            "Horizontal", "Left", "YE_HIDE", (5, 1, 1, 2)],
-            "speed":                ["ComboBox",                                        "Left", "YE_HIDE", (6, 1, 1, 2)],
-        }
-        widget_buttons = {
-            "start_button":         ["PushButton", "Start",                             "Left", "NO_HIDE", (8, 0, 1, 5)],
-            "stop_button":          ["PushButton", "Stop",                              "Left", "NO_HIDE", (8, 0, 1, 5)],
-            "continue_button":      ["PushButton", "Yes",                               "Left", "NO_HIDE", (8, 0, 1, 3)],
-            "cancel_button":        ["PushButton", "Cancel",                            "Left", "NO_HIDE", (8, 3, 1, 2)],
-        }
-        widget_combined = {**widget_layout, **widget_buttons}
-
-        widget_boxes = {
-            "audio_bitrate_slider": [1, 8, 0.75],
-            "threads":              [1, os.cpu_count(), 0.75],
-            "speed": ["veryslow", "slower", "slow", "medium", "fast", "faster", "veryfast", "ultrafast"],
-            "output_ext": ["mp4", "mkv", "avi", "ts", "png"],
-            "audio_which": ["copy", "slider", "input"],
-        }
-
-        def parse_layout(widgetDict):
+        def parse_layout(widgetDictionary):
             self.layout = QtWidgets.QGridLayout(self)
-
-            for key in widgetDict:
-                layout = widgetDict[key][-1]
-                val = widgetDict[key]
+            for key in widgetDictionary:
+                layout = widgetDictionary[key][-1]
+                vals = widgetDictionary[key]
                 given = "self."+key
-                exec(f"{given} = QtWidgets.Q{val[0]}()")
-                if val[0] in ["Label", "PushButton", "ToolButton"]:  # text
-                    exec(f"{given}.setText('{val[1]}')")
-                if val[0] in ["Label", "LineEdit"]:  # alignment
-                    exec(f"{given}.setAlignment(Qt.Align{val[2]})")
-                if val[0] == "ComboBox":  # box items
+                exec(f"{given} = QtWidgets.Q{vals[0]}()")
+                if vals[0] in ["Label", "PushButton", "ToolButton"]:  # text
+                    exec(f"{given}.setText('{vals[1]}')")
+                if vals[0] in ["Label", "LineEdit"]:  # alignment
+                    exec(f"{given}.setAlignment(Qt.Align{vals[-3]})")
+                if vals[0] == "ComboBox":  # box items
                     exec(f"{given}.addItems({widget_boxes[key]})")
-                if val[0] == "Slider":  # sliders
-                    exec(
-                        f"{given}.setRange({widget_boxes[key][0]}, {widget_boxes[key][1]})")
-                    exec(
-                        f"{given}.setValue({widget_boxes[key][1]*widget_boxes[key][2]})")
-                    exec(f"{given}.setOrientation(Qt.Orientation.{val[-4]})")
-                # apply layout
+                if vals[0] == "Slider":  # sliders
+                    exec(f"{given}.setRange({widget_boxes[key][0]}, \
+                                            {widget_boxes[key][1]})")
+                    exec(f"{given}.setValue({widget_boxes[key][1]} * \
+                                            {widget_boxes[key][2]})")
+                    exec(f"{given}.setOrientation(Qt.Orientation.{vals[1]})")
                 exec(f"self.layout.addWidget({given}, {layout[0]}, \
-                      {layout[1]}, {layout[2]}, {layout[3]})")
+                      {layout[1]}, {layout[2]}, {layout[3]})")  # apply layout
+        parse_layout(widget_layout)
 
-        parse_layout(widget_combined)
-        timer.print("Widgets added")
-        # exit()
-        self.hide_show_widgets(1, 0, 0)
-        # if input_text changed, update output_text_input
-        self.input_text.textChanged.connect(self.input_text_changed)
-        self.input_file.clicked.connect(self.input_file_select_clicked)
-        self.output_ext.currentTextChanged.connect(self.output_box_changed)
-        self.audio_which.currentTextChanged.connect(self.audio_box_changed)
-        self.threads.valueChanged.connect(self.slider_changed)
-        self.start_button.clicked.connect(self.start_button_clicked)
-        self.stop_button.clicked.connect(self.stop_button_clicked)
-        self.continue_button.clicked.connect(self.overwrite_button_clicked)
-        self.cancel_button.clicked.connect(self.cancel_button_clicked)
-        self.audio_bitrate_input.setToolTip("non-numbers will be stripped.")
-        self.video_bitrate.setToolTip("non-numbers will be stripped.")
-        self.v_bitrate_dialog_2.setToolTip("1 mb = 1000 kb")
-        self.audio_bitrate_input.hide()
-        self.audio_bitrate_slider.hide()
+        timer.print("Widgets created")
+        self.changeButtons(0)
+        self.input_text.textChanged.connect(self.inputChanged)
+        self.input_button.clicked.connect(self.inputButtonClicked)
+        self.outputDrop.currentTextChanged.connect(self.inputChanged)
+        self.audioDrop.currentTextChanged.connect(self.audioDropChanged)
+        self.thread.valueChanged.connect(self.threadChanged)
+        self.work_button.clicked.connect(self.workClicked)
+        self.yes_button.clicked.connect(self.yesClicked)
+        self.no_button.clicked.connect(self.noClicked)
+        timer.print("widgets connected")
+        self.inputChanged()
+        self.audioDropChanged()
+        self.threadChanged()
+    # def addButtons(self):
 
-    def reset_dialog(self):
-        self.status_dialog.setText(widget_layout["status_dialog"][1])
-        for key in widget_buttons:
-            exec(f"self.{key}.setText('{widget_buttons[key][1]}')")
+    def changeButtons(self, num):
+        '''0 = Start, 1 = Stop, 2 = Yes/No dialog'''
+        self.work_button.setVisible(True)
+        self.yes_button.setVisible(False)
+        self.no_button.setVisible(False)
+        if num == 0:
+            self.work_button.setText("Start")
+        if num == 1:
+            self.work_button.setText("Stop")
+        if num == 2:
+            self.work_button.setVisible(False)
+            self.no_button.setVisible(True)
+            self.yes_button.setVisible(True)
 
-    def input_text_changed(self):
-        if self.input_text.text() == "":
-            self.output_text_input.setText("")
-        else:
-            self.output_text_input.setText("%Input_Path%/"+(self.input_text.text()).split(
-                "/")[-1].split(".")[0]+"-converted."+self.output_ext.currentText())
-
-    def input_file_select_clicked(self):
-        if sys.platform == "win32":
-            self.input_text.setText(QtWidgets.QFileDialog.getOpenFileName(
-                self, "Select input file", "c:\\users\\")[0])
-        else:
-            file = QtWidgets.QFileDialog.getOpenFileName(
-                self, "Select a video file", os.path.expanduser("~"))
-            self.input_text.setText(file[0])
-        print("selected"+self.input_text.text())
-
-    def hide_show_widgets(self, inst_start, int_stop, int_que):
-        self.start_button.setHidden(not bool(inst_start))
-        self.stop_button.setHidden(not bool(int_stop))
-        self.continue_button.setHidden(not bool(int_que))
-        self.cancel_button.setHidden(not bool(int_que))
-
-    def output_box_changed(self):
-        extension = "."+self.output_ext.currentText()
-        if self.output_ext.currentText() == "png":
-            extension = "/%06d.png"
-        self.output_text_input.setText("%Input_Path%/"+(self.input_text.text()).split(
-            "/")[-1].split(".")[0]+"-converted"+extension)
-
-    def audio_box_changed(self):
-        audio_dict = {"copy": [True, True], "slider": [False, True],
-                      "input": [True, False]}
-        for i in audio_dict:
-            if self.audio_which.currentText() == i:
-                self.audio_bitrate_input.setVisible(audio_dict[i][0])
-                self.audio_bitrate_slider.setVisible(audio_dict[i][1])
-
-    def slider_changed(self):
-        self.threads_dialog_ratio.setText(
-            f"{str(self.threads.value()).zfill(len(str(os.cpu_count())))} / {os.cpu_count()}")
-        self.threads_dialog_ratio.update()
-
-    def enable_disable_widgets(self, inint):
-        '''inint = 0: disable, inint = 1: enable'''
-        for i in widget_layout:
-            if widget_layout[i][-2] == "YE_HIDE":
-                exec(f"self.{i}.setEnabled(bool({inint}))")
-
-    def modify_status(self, text):
-        self.status_dialog.setText(text)
-        self.status_dialog.update()
-
-    def get_output_file(self):
+    def realOutput(self):
         return self.output_text_input.text().replace("%Input_Path%", os.path.dirname(self.input_text.text()))
 
-    def start_button_clicked(self):
-        self.input = self.input_text.text()
-        if not os.path.exists(self.input):
-            self.status_dialog.setText("Input file does not exist.")
-            self.status_dialog.update()
+    def WidgetsEditable(self, num):
+        for i in widget_layout:
+            if widget_layout[i][-2] == "YE_HIDE":
+                exec(f"self.{i}.setEnabled(bool({num}))")
+
+    def inputChanged(self):
+        now_extension = self.outputDrop.currentText()
+        extension = "/%06d.png" if now_extension == "png" else now_extension
+        self.output_text_input.setText(
+            "" if self.input_text.text() == "" else
+            "%Input_Path%/"  # input path
+            + (self.input_text.text()).split("/")[-1].split(".")[0]
+            + "-converted." + extension)  # suffix
+        self.output_text_input.update()
+
+    def inputButtonClicked(self):
+        home = str("c:\\users\\" if sys.platform == "win32" else
+                   os.path.expanduser("~"))
+        file = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Select input file", home)[0]
+        self.input_text.setText(file)
+
+    def audioDropChanged(self):
+        """ copy = 0, slider = 1, input = 2"""
+        index = self.audioDrop.currentIndex()
+        audio_dict = ([False, False], [False, True],
+                      [True, False], [False, False])
+        self.audio_bitrate_input.setVisible(audio_dict[index][0])
+        self.audio_bitrate_slider.setVisible(audio_dict[index][1])
+
+    def threadChanged(self):
+        self.threads_dialog_ratio.setText(
+            f"{str(self.thread.value()).zfill(len(str(os.cpu_count())))} / {os.cpu_count()}")
+        self.threads_dialog_ratio.update()
+
+    def noClicked(self):
+        self.status_dialog.setText("Awaiting input")
+        self.work_button.setText("Start")
+        self.WidgetsEditable(1)
+        self.changeButtons(0)
+
+    def yesClicked(self):
+        if self.stopped_preemptively == True:
+            os.remove(self.realOutput())
+            self.noClicked()
+            self.stopped_preemptively = False
             return
-        ffmpeg_output = self.get_output_file()
-        if os.path.exists(ffmpeg_output):
-            print(ffmpeg_output, "already exists.")
-            self.status_dialog.setText("Output already exists, overwrite?")
-            self.hide_show_widgets(0, 0, 1)
-            self.enable_disable_widgets(False)
-            # self.overwrite_button_clicked()
-        else:
-            print("output does not exist.")
-            self.overwrite_button_clicked()
+        self.startFfmpeg()
 
-    def overwrite_button_clicked(self):
-        self.hide_show_widgets(1, 1, 0)
-        self.modify_status("Converting...")
-        self.enable_disable_widgets(0)
-        self.run_ffmpeg()
-
-    def cancel_button_clicked(self):
-        self.reset_dialog()
-        self.hide_show_widgets(1, 0, 0)
-        self.enable_disable_widgets(1)
-
-    def stop_button_clicked(self):
-        self.hide_show_widgets(1, 0, 0)
-        self.enable_disable_widgets(0)
-        self.modify_status("Conversion stopped. delete unfinished video?")
-        self.hide_show_widgets(0, 0, 1)
-        self.continue_button.setText("Yes")
-        self.cancel_button.setText("No")
-        self.continue_button.clicked.disconnect()
-        self.continue_button.clicked.connect(self.delete_mp4)
-
-    def delete_mp4(self):
-        if not self.output_text_input.text().split("/")[0] == "%Input_Path%":
-            ffmpeg_output = self.output_text_input.text()
-        else:
-            ffmpeg_output = os.path.dirname(self.input_text.text()) \
-                + "/" + self.output_text_input.text().split("/")[-1]
-        if os.path.exists(ffmpeg_output):
-            os.remove(ffmpeg_output)
-            print(f"removed {self.output_text_input.text()}")
-        self.enable_disable_widgets(1)
-        self.continue_button.clicked.disconnect()
-        self.continue_button.clicked.connect(self.overwrite_button_clicked)
-        self.cancel_button_clicked()
-
-    def run_ffmpeg(self):
+    def startFfmpeg(self):
         timer.reset()
-        ffmpeg_input_file = self.input_text.text()
-        ffmpeg_video_bitrate = "".join(
-            [val for val in self.video_bitrate.text() if val.isnumeric()]) + "k"
-        ffmpeg_audio_bitrate = ""
-        if self.audio_which.currentText() == "slider":
-            ffmpeg_audio_bitrate = str(
-                self.audio_bitrate_slider.value()*32) + "k"
-        elif self.audio_which.currentText() == "input":
-            ffmpeg_audio_bitrate = str(self.audio_bitrate_input.text()) + "k"
-
-        ffmpeg_output = self.get_output_file()
-        if self.output_ext.currentText() == "png":
-            if not os.path.exists(os.path.dirname(ffmpeg_output)):
-                os.makedirs(os.path.dirname(ffmpeg_output))
         local_ffmpeg = os.path.dirname(os.path.realpath(__file__)) + "/ffmpeg"
-        ffmpeg_path = local_ffmpeg if os.path.exists(
-            local_ffmpeg) else "ffmpeg"
-        print("using:", ffmpeg_path)
-        command = [ffmpeg_path]  # get ffmpeg path
-        command.extend(['-y'])
-        command.extend(['-i', ffmpeg_input_file])
-        command.extend(['-threads', str(self.threads.value())])
-        command.extend(['-preset', self.speed.currentText()])
-        if self.output_ext.currentText() != "png":
-            command.extend(['-c:v', 'libx264'])
-            command.extend(['-b:v', ffmpeg_video_bitrate]
-                           if self.video_bitrate.text() != "" else ["-q:v", "0"])
-            command.extend(
-                ['-c:a', 'copy'] if self.audio_which.currentText() == "copy" else ['-c:a', 'aac'])
-            command.extend(['-b:a', ffmpeg_audio_bitrate]
-                           if ffmpeg_audio_bitrate != "" else ["-q:a", "0"])
-            command.extend(['-map', '0:v:?', '-map', '0:a:?'])
-        command.extend([ffmpeg_output])
-        print(command)
-        # run ffmpeg in a separate thread
-        ffmpeg_thread_main = subprocess.Popen(
+        vindex = self.videoDrop.currentIndex()
+        aindex = self.audioDrop.currentIndex()
+        ffargs = {
+            "path": local_ffmpeg if os.path.exists(local_ffmpeg) else "ffmpeg",
+            "input": self.input_text.text(),
+            "output": self.realOutput(),
+            "vidbr": "".join([val for val in self.video_bitrate.text() if val.isnumeric()]),
+            "audbr_s": str(self.audio_bitrate_slider.value()*32)+"k",
+            "audbr_i": self.audio_bitrate_input.text(),
+            "threads": str(self.thread.value()),
+            "speed": self.speed.currentText(),
+            "fps": "".join([val for val in self.fps.text() if val.isnumeric()])
+        }
+        command = sum([[ffargs['path'], '-y'],
+                       ['-i', ffargs['input'], '-c:v', 'libx264'],
+                       ['-threads', ffargs['threads']],
+                       ['-b:v', ffargs['vidbr'] + "k"] if vindex == 0 and ffargs['vidbr'] != "" else
+                       ['-crf', ffargs['vidbr']] if vindex == 1 else
+                       ['-q:v', ffargs['vidbr'] if ffargs['vidbr'] != "" else "0"],
+                       ['-c:a', 'copy'] if aindex == 0 else [],
+                       ['-b:a', ffargs['audbr_s']] if aindex == 1 else [],
+                       ['-b:a', ffargs['aidbr_i']] if aindex == 2 else [],
+                       ['-an'] if aindex == 3 else [],
+                       ['-r', ffargs['fps']] if ffargs['fps'] != "" else [],
+                       ['-map', '0:v:?', '-map', '0:a:?'],
+                       [ffargs['output']]], [])
+        ffmpegThread = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        timer.print("ffmpeg initalized")
+        timer.print("ffmpeg initialized")
 
-        def kill_function():
-            print("killing ffmpeg")
+        def ffmpegCancel():
+            timer.print("killing ffmpeg")
             if sys.platform == "win32":  # windows doesn't use SIGINT for some reason
                 while ffmpeg_thread_main.poll() is None:
                     os.kill(ffmpeg_thread_main.pid, signal.CTRL_C_EVENT)
                     time.sleep(3)
             else:
-                while ffmpeg_thread_main.poll() is None:
-                    ffmpeg_thread_main.send_signal(signal.SIGINT)
+                while ffmpegThread.poll() is None:
+                    ffmpegThread.send_signal(signal.SIGINT)
                     time.sleep(2.8)
-            print("\nkilled ffmpeg")
+            timer.print("\nkilled ffmpeg")
+            self.work_button.clicked.disconnect()
+            self.work_button.clicked.connect(self.workClicked)
+            self.status_dialog.setText(
+                "Conversion stopped. delete unfinished video?")
+            self.changeButtons(2)
+            self.stopped_preemptively = True
 
-        def ffmpeg_waiting():
-            print("waiting for ffmpeg to finish")
-            errors = ffmpeg_thread_main.communicate()
-            ffmpeg_thread_main.wait()
-            if ffmpeg_thread_main.returncode != 0:
-                if not self.continue_button.isVisible():
-                    print("ffmpeg failed")
-                    self.hide_show_widgets(1, 0, 0)
-                    self.enable_disable_widgets(1)
-                    errors = "\n".join(
-                        errors[-1].decode("utf-8").rsplit("\n", 4)[-3:])
-                    self.resize(self.width()+50, self.height())
-                    self.status_dialog.setText(str(errors))
-                    print(errors)
-                    # if errors contains "invalid argument",
-                    if "invalid argument" in errors[-1]:
-                        self.status_dialog.setText(
-                            "Invalid argument, Please check your input.")
-                    return errors
-            print("\nffmpeg finished")
-            if not self.continue_button.isVisible():
+        def ffmpegWait():
+            errors = ffmpegThread.communicate()
+            ffmpegThread.wait()
+            if ffmpegThread.returncode not in [0, 255]:
+                timer.poll(f"({ffmpegThread.returncode}): ffmpeg failed")
+                errors = "\n".join(errors[-1].
+                                   decode("utf-8").
+                                   rsplit("\n", 4)[-2:])
+                self.status_dialog.setText(errors)
+                print(errors)
+                return errors
+            else:
                 self.status_dialog.setText("Conversion complete!")
-                self.hide_show_widgets(1, 0, 0)
-                self.enable_disable_widgets(1)
+            self.work_button.clicked.disconnect()
+            self.work_button.clicked.connect(self.workClicked)
+            self.changeButtons(0)
+            self.WidgetsEditable(1)
+            timer.print("\nffmpeg finished")
+        self.status_dialog.setText("Converting...")
+        self.changeButtons(1)
+        self.WidgetsEditable(0)
+        self.work_button.clicked.disconnect()
+        self.work_button.clicked.connect(ffmpegCancel)
+        self.ffmpegWaitThread = threading.Thread(target=ffmpegWait)
+        self.ffmpegWaitThread.start()
 
-        self.stop_button.clicked.connect(kill_function)
-        ffmpeg_thread_wait = threading.Thread(target=ffmpeg_waiting)
-        ffmpeg_thread_wait.start()
+    def workClicked(self):
+        input_file = self.input_text.text()
+        work_step = self.work_button.text()
+        if work_step == "Start":
+            if not os.path.exists(input_file):
+                self.status_dialog.setText("Input file does not exist.")
+                print("File not found")
+                return
+        ffmpeg_output = self.realOutput()
+        if os.path.exists(ffmpeg_output):
+            print(ffmpeg_output, "already exists.")
+            self.status_dialog.setText("Output already exists, overwrite?")
+            self.changeButtons(2)
+            self.WidgetsEditable(0)
+        else:
+            print("running...")
+            self.startFfmpeg()
 
 
 if __name__ == "__main__":

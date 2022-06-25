@@ -1,3 +1,4 @@
+# coding: utf-8
 import math
 import os
 import signal
@@ -194,7 +195,7 @@ class MainWindow(QtWidgets.QWidget):
         self.output_text_input.setText(
             "" if self.input_text.text() == "" else
             "%Input_Path%/"  # input path
-            + (self.input_text.text()).split("/")[-1].split(".")[0]
+            + os.path.basename(self.input_text.text()).split(".")[0]
             + "-converted." + extension)  # suffix
         self.output_text_input.update()
 
@@ -312,8 +313,8 @@ class MainWindow(QtWidgets.QWidget):
         def ffmpegCancel():
             timer.print("killing ffmpeg")
             if sys.platform == "win32":  # windows doesn't use SIGINT for some reason
-                while ffmpeg_thread_main.poll() is None:
-                    os.kill(ffmpeg_thread_main.pid, signal.CTRL_C_EVENT)
+                while ffmpegThread.poll() is None:
+                    os.kill(ffmpegThread.pid, signal.CTRL_C_EVENT)
                     time.sleep(3)
             else:
                 while ffmpegThread.poll() is None:
@@ -375,7 +376,8 @@ class MainWindow(QtWidgets.QWidget):
                         "\nbitrate: " + line_dict['bitrate'],
                         "size: " + self.byteFormat(line_dict['total_size']),
                     ]
-                    timer.poll(("\033[A\r\033[K"*4)+", ".join(used_list)+"\n")
+                    timer.poll(line_dict)
+                    # timer.poll(("\033[A\r\033[K"*4)+", ".join(used_list)+"\n")
                     self.status_dialog.setText(", ".join(used_list))
                 file.close()
                 time.sleep(0.5)

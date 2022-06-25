@@ -192,6 +192,7 @@ class MainWindow(QtWidgets.QWidget):
     def inputChanged(self):
         now_extension = self.outputDrop.currentText()
         extension = "/%06d.png" if now_extension == "png" else now_extension
+        self.input_text.setText(self.input_text.text().replace("\"", ""))
         self.output_text_input.setText(
             "" if self.input_text.text() == "" else
             "%Input_Path%/"  # input path
@@ -376,7 +377,8 @@ class MainWindow(QtWidgets.QWidget):
                         "\nbitrate: " + line_dict['bitrate'],
                         "size: " + self.byteFormat(line_dict['total_size']),
                     ]
-                    timer.poll(line_dict)
+                    for i in line_dict:
+                        print(i)
                     # timer.poll(("\033[A\r\033[K"*4)+", ".join(used_list)+"\n")
                     self.status_dialog.setText(", ".join(used_list))
                 file.close()

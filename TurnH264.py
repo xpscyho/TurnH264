@@ -1,72 +1,20 @@
 # coding: utf-8
 import math
 import os
+import shutil
 import signal
 import subprocess
 import sys
 import threading
 import time
-
+from pprint import pprint
+from utilities import timer, printProgressBar, ffmpeg_utils
 from PySide6 import QtGui, QtWidgets
 # this is used, but run in exec so they are shown as unused (at least in MY IDE)
 from PySide6.QtCore import Qt
 
 
-class timer:  # timer setup ####
-    def start():
-        '''start the timer'''
-        timer.timer_start_time = time.time()
-
-    def print(instr, end='\n'):
-        '''print and restart the timer'''
-        if timer.timer_start_time is None:
-            timer.start()
-            print("Started timer")
-            return
-        now = time.time()
-        diff = (now - timer.timer_start_time) * 1000
-        timer.timer_start_time = now
-        print(f"{instr}: ms{diff:.4f}", end=end)
-        return diff
-
-    def poll(instr, end='\n'):
-        '''print without restarting the timer'''
-        now = time.time()
-        print(f"{instr}: ms{(now - timer.timer_start_time) * 1000:.4f}", end=end)
-
-    def reset():
-        '''restart the timer'''
-        timer.timer_start_time = time.time()
-
-
-# custom progress bar (slightly modified) [https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console]
-def printProgressBar(
-    printing=True, iteration=0, total=1000, length=100, fill="#", nullp="-", color=True, end="\r"
-):
-    """
-    iteration   - Required  : current iteration (Int)
-    total       - Required  : total iterations (Int)
-    length      - Optional  : character length of bar (Int)
-    fill        - Optional  : bar fill character (Str)
-    """
-    # color1="\033[93m", color2="\033[92m"
-    color1 = "\033[93m"
-    color2 = "\033[92m"
-    filledLength = int(length * iteration // total)
-    # doing this allows for multi-character fill
-    fill = (fill*length)[:filledLength]
-    nullp = (nullp*(length - filledLength))
-    bar = fill + nullp
-    # like this: <!i!i!i!i!i!.......................................>
-    command = f"{color2}<{color1}{bar}{color2}>\033[0m" if color else f"<{bar}>"
-    if printing:
-        print(command, end=end)
-    # Print New Line on Complete
-    if iteration == total:
-        print()
-    return command
-
-
+# print(ffmpeg_path)
 timer.reset()
 widget_layout = {
     "input_dialog":         ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
@@ -88,17 +36,17 @@ widget_layout = {
     "thread":               ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
     "threads_dialog_ratio": ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
     "speed_dialog":         ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
-    "speedDrop":                ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
+    "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
     "fps_dialog":           ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
     "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
-    "res_dialog":           ["Label", "resolution:",        "Left", "YE_HIDE", (8, 0, 1, 1)],
+    "res_dialog":           ["Label", "resolution:",       "Left", "YE_HIDE", (8, 0, 1, 1)],
     "res_line":             ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
     "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
 
     "status_dialog":        ["Label", "Awaiting input",  "Center", "NO_HIDE", (9, 0, 1, 5)],
-    "work_button":          ["PushButton", "Start",        "Left", "NO_HIDE", (10, 0, 1, 5)],
-    "yes_button":           ["PushButton", "Continue",     "Left", "NO_HIDE", (10, 0, 1, 3)],
-    "no_button":            ["PushButton", "Cancel",       "Left", "NO_HIDE", (10, 3, 1, 2)]
+    "work_button":          ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
+    "yes_button":           ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
+    "no_button":            ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)],
 }
 widget_boxes = {
     "audio_bitrate_slider": [1, 8, 0.75],
@@ -122,6 +70,23 @@ class MainWindow(QtWidgets.QWidget):
         self.setMinimumSize(320, 260)
         self.addWidgets()
         self.stopped_preemptively = False
+        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
+        if self.ffmpeg_path == 1:
+            def wait_for_ffmpeg():
+                ffmpeg_paths_thread.join()
+                self.status_dialog.setText("Awaiting input")
+                self.WidgetsEditable(1)
+                self.work_button.setEnabled(True)
+
+            timer.print("ffmpeg not detected, downloading...")
+            ffmpeg_paths_thread = threading.Thread(target=ffmpeg_utils.download)
+            ffmpeg_paths_thread.start()
+            ffmpeg_paths_wait = threading.Thread(target=wait_for_ffmpeg)
+            ffmpeg_paths_wait.start()
+            self.status_dialog.setText("ffmpeg not detected, downloading...")
+            self.WidgetsEditable(0)
+            self.work_button.setEnabled(False)
+        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
 
     def addWidgets(self):
         timer.reset()
@@ -160,6 +125,7 @@ class MainWindow(QtWidgets.QWidget):
         self.work_button.clicked.connect(self.workClicked)
         self.yes_button.clicked.connect(self.yesClicked)
         self.no_button.clicked.connect(self.noClicked)
+        self.fps.textChanged.connect(self.inputChanged)
         timer.print("widgets connected")
         self.speedDrop.setCurrentIndex(3)
         self.inputChanged()
@@ -190,14 +156,19 @@ class MainWindow(QtWidgets.QWidget):
                 exec(f"self.{i}.setEnabled(bool({num}))")
 
     def inputChanged(self):
-        now_extension = self.outputDrop.currentText()
-        extension = "/%06d.png" if now_extension == "png" else now_extension
-        self.input_text.setText(self.input_text.text().replace("\"", ""))
-        self.output_text_input.setText(
-            "" if self.input_text.text() == "" else
-            "%Input_Path%/"  # input path
-            + os.path.basename(self.input_text.text()).split(".")[0]
-            + "-converted." + extension)  # suffix
+        if self.input_text.text() != "":
+            text = "".join([
+                "%Input_Path%/",  # input path
+                os.path.basename(self.input_text.text()).split(".")[0],
+                "-converted",
+                (f"-{self.fps.text()}fps" if self.fps.text() != "" else "")
+            ])
+            now_extension = self.outputDrop.currentText()
+            text = os.path.join(
+                text, "%06d.png") if now_extension == "png" else text+"."+now_extension
+            self.output_text_input.setText(text)
+        else:
+            self.output_text_input.setText("")
         self.output_text_input.update()
 
     def inputButtonClicked(self):
@@ -232,7 +203,10 @@ class MainWindow(QtWidgets.QWidget):
 
     def yesClicked(self):
         if self.stopped_preemptively == True:
-            os.remove(self.realOutput())
+            if self.outputDrop.currentText() != "png":
+                os.remove(self.realOutput())
+            else:
+                shutil.rmtree(os.path.dirname(self.realOutput()))
             self.noClicked()
             self.stopped_preemptively = False
             return
@@ -240,24 +214,28 @@ class MainWindow(QtWidgets.QWidget):
 
     def byteFormat(self, size, suffix="B"):
         '''modified version of: https://stackoverflow.com/a/1094933'''
-        size = int(size)
-        for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti']:
-            if abs(size) < 2**10:
-                return f"{size:3.1f}{unit}{suffix}"
-            size /= 2**10
-        return f"{size:3.1f}{unit}{suffix}"
+        size = "".join([val for val in size if val.isnumeric()])
+        if size != "":
+            size = int(size)
+            for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti']:
+                if abs(size) < 2**10:
+                    return f"{size:3.1f}{unit}{suffix}"
+                size /= 2**10
+            return f"{size:3.1f}{unit}{suffix}"
+        else:
+            return f"N/A{suffix}"
 
     def startFfmpeg(self):
         self.status_dialog.setText("Converting...")
         timer.reset()
-        local_ffmpeg = os.path.dirname(os.path.realpath(__file__)) + "/ffmpeg"
+
         vindex = self.videoDrop.currentIndex()
         aindex = self.audioDrop.currentIndex()
         rindex = self.resDrop.currentIndex()
     # handle resolutions
         reses = {}
         reses['input_res'] = [int(val.split("=")[1]) for val in subprocess.check_output(
-                             ['ffprobe', '-v', 'error', '-show_entries', 'stream=width,height',
+                             [self.ffmpeg_path[1], '-v', 'error', '-show_entries', 'stream=width,height',
                               '-of', 'default=noprint_wrappers=1', self.input_text.text()]).
                               decode("utf-8").split("\n")[:-1]]
         reses['res_line'] = int(self.res_line.text()
@@ -271,17 +249,24 @@ class MainWindow(QtWidgets.QWidget):
                 self.status_dialog.setText(
                     "Warning: the specified resolution is not an int.\nresult may be imprecise")
                 timer.print(f"{reses['new_res']} is imprecise, flooring...")
-        reses['new_res'] = [math.floor(val)-(math.floor(val)%2) for val in reses['new_res']]
-        ffargs = {"path": local_ffmpeg if os.path.exists(local_ffmpeg) else "ffmpeg",
+        reses['new_res'] = [math.floor(val)-(math.floor(val) % 2)
+                            for val in reses['new_res']]
+        ffargs = {"path": self.ffmpeg_path[0],
                   "input":   ['-i', self.input_text.text()],
                   "output":  self.realOutput(),
+                  "extension": self.outputDrop.currentText(),
                   "vidbr":   "".join([val for val in self.video_bitrate.text() if val.isnumeric()]),
                   "audbr_s": str(self.audio_bitrate_slider.value()*32)+"k",
                   "audbr_i": self.audio_bitrate_input.text(),
                   "threads": ['-threads', str(self.thread.value())],
                   "speedDrop":   ['-preset', self.speedDrop.currentText()],
-                  "fps":     "".join([val for val in self.fps.text() if val.isnumeric()])}
-
+                  "fps":     "".join([val for val in self.fps.text() if val.isnumeric()]),
+                  "scale":      f"{reses['new_res'][0]}:{reses['new_res'][1]}"
+                  }
+        print(ffargs)
+        if self.outputDrop.currentText() == "png":
+            if not os.path.exists(os.path.dirname(ffargs['output'])):
+                os.mkdir(os.path.dirname(ffargs['output']))
         # tmpdir for progress bar
         tmpdir = os.path.dirname(os.path.realpath(__file__)) + "/.TurnH264.tmp"
         if os.path.exists(tmpdir):
@@ -290,21 +275,28 @@ class MainWindow(QtWidgets.QWidget):
 
         self.command = sum([[ffargs['path'], '-y'],
                             ffargs['input'],
-                            ['-map', '0:v:?', '-map', '0:a:?'],
-                            ['-c:v', 'libx264'],
                             ffargs['threads'],
                             ffargs['speedDrop'],
-                            ['-b:v', ffargs['vidbr'] + "k"] if vindex == 0 and ffargs['vidbr'] != "" else
-                            ['-crf', ffargs['vidbr']] if vindex == 1 and ffargs['vidbr'] != "" else
-                            ['-q:v', '0'],
-                            ['-c:a', 'copy'] if aindex == 0 else
-                            ['-b:a', ffargs['audbr_s']] if aindex == 1 else
-                            ['-b:a', ffargs['aidbr_i']] if aindex == 2 else ['-an'],
-                            ['-r', ffargs['fps']] if ffargs['fps'] != "" else [],
-                            ['-vf', f'scale={reses["new_res"][0]}:{reses["new_res"][1]}'] if
-                            rindex != 0 and reses['input_res'] != reses['new_res'] else [],
                             ['-progress', '-', '-nostats'],
-                            [ffargs['output']]], [])
+                            ['-r', ffargs['fps']] if ffargs['fps'] != "" else []
+                            ], [])
+        if self.outputDrop.currentText() != "png":
+            self.command += sum([['-c:v', 'libx264'],
+                                 ['-map', '0:v:?', '-map',
+                                 '0:a:?', '-map_metadata', "0"],
+                                 ['-b:v', ffargs['vidbr'] + "k"] if vindex == 0 and ffargs['vidbr'] != "" else
+                                 ['-crf', ffargs['vidbr']] if vindex == 1 and ffargs['vidbr'] != "" else
+                                 ['-q:v', '0'],
+                                 ['-c:a', 'copy'] if aindex == 0 else
+                                 ['-b:a', ffargs['audbr_s']] if aindex == 1 else
+                                 ['-b:a', ffargs['aidbr_i']
+                                  ] if aindex == 2 else ['-an']
+                                 ], [])
+        print(self.command)
+        self.command += sum([['-vf', f'scale={ffargs["scale"]}'] if
+                             rindex != 0 and reses['input_res'] != reses['new_res'] else [],
+                             [ffargs['output']],
+                             ], [])
         print(" ".join(self.command))
         # return
         ffmpegThread = subprocess.Popen(
@@ -323,6 +315,7 @@ class MainWindow(QtWidgets.QWidget):
                     time.sleep(2.8)
             timer.print("\nkilled ffmpeg")
             self.stopped_preemptively = True
+            self.WidgetsEditable(0)
             self.status_dialog.setText(
                 "Conversion stopped. delete unfinished video?")
             self.changeButtons(2)
@@ -342,8 +335,7 @@ class MainWindow(QtWidgets.QWidget):
             os.remove(tmpdir)
 
         def ffmpegWatch():
-            time.sleep(2)  # so the lastline stuff doesnt get tripped
-            # get the frame count of the video for progress bar
+            time.sleep(0.5)
             # ffprobe -v error -select_streams v:0 -count_packets -show_entries stream=nb_read_packets -of csv=p=0 input.mp4
             video_frame = subprocess.check_output([
                 "ffprobe", "-v", "error", "-select_streams", "v:0",
@@ -353,7 +345,6 @@ class MainWindow(QtWidgets.QWidget):
             video_frame_total = video_frame.decode("utf-8").strip()
             video_frame_total = int(
                 "".join([val for val in video_frame_total if val.isnumeric()]))
-            #  "".join([val for val in self.video_bitrate.text() if val.isnumeric()])
             print("\n"*4)
             while os.path.exists(tmpdir):
                 file = open(tmpdir, "r")
@@ -377,9 +368,7 @@ class MainWindow(QtWidgets.QWidget):
                         "\nbitrate: " + line_dict['bitrate'],
                         "size: " + self.byteFormat(line_dict['total_size']),
                     ]
-                    for i in line_dict:
-                        print(i)
-                    # timer.poll(("\033[A\r\033[K"*4)+", ".join(used_list)+"\n")
+                    print(", ".join(used_list))
                     self.status_dialog.setText(", ".join(used_list))
                 file.close()
                 time.sleep(0.5)

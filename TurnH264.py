@@ -8,11 +8,12 @@ import sys
 import threading
 import time
 from pprint import pprint
-from utilities import timer, printProgressBar, ffmpeg_utils
+
 from PySide6 import QtGui, QtWidgets
 # this is used, but run in exec so they are shown as unused (at least in MY IDE)
 from PySide6.QtCore import Qt
 
+from utilities import ffmpeg_utils, printProgressBar, timer
 
 # print(ffmpeg_path)
 timer.reset()
@@ -154,8 +155,8 @@ class MainWindow(QtWidgets.QWidget):
         for i in widget_layout:
             if widget_layout[i][-2] == "YE_HIDE":
                 exec(f"self.{i}.setEnabled(bool({num}))")
-
     def inputChanged(self):
+        self.input_text.setText(self.input_text.text().replace("\"", ""))
         if self.input_text.text() != "":
             text = "".join([
                 "%Input_Path%/",  # input path
@@ -268,7 +269,7 @@ class MainWindow(QtWidgets.QWidget):
             if not os.path.exists(os.path.dirname(ffargs['output'])):
                 os.mkdir(os.path.dirname(ffargs['output']))
         # tmpdir for progress bar
-        tmpdir = os.path.dirname(os.path.realpath(__file__)) + "/.TurnH264.tmp"
+        tmpdir = self.input_text.text() + '.tmp'
         if os.path.exists(tmpdir):
             os.remove(tmpdir)
         tmpfile = open(tmpdir, "w")
@@ -386,6 +387,8 @@ class MainWindow(QtWidgets.QWidget):
     def workClicked(self):
         input_file = self.input_text.text()
         work_step = self.work_button.text()
+        if self.status_dialog.text() == "Awaiting input":
+            self.stopped_preemptively = False
         if work_step == "Start":
             if not os.path.exists(input_file):
                 self.status_dialog.setText("Input file does not exist.")

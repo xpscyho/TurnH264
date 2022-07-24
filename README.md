@@ -2,6 +2,7 @@
 
 <p align=center>
 <img src="Screenshot.png"/>
+<img src="Screenshot_windows.png"/>
 </p>
 
 ---
@@ -44,4 +45,4 @@ otherwise:
 
 ---
 
-My fork was developed alongside this master branch during pre-release hence the differences in code.
+My fork was developed alongside this master branch during pre-release hence the large differences in code.

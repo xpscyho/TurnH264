@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-
 try:
     subprocess.check_output(["pyinstaller", "--version"])
 except:
@@ -10,6 +9,7 @@ except:
 
 subprocess.check_output(["pyinstaller",
                          '--windowed',
+			 '--onefile',
                          "TurnH264.py"])
 shutil.rmtree("build")
 os.remove("TurnH264.spec")

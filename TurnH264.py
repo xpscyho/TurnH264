@@ -18,27 +18,28 @@ from utilities import ffmpeg_utils, printProgressBar, timer
 # print(ffmpeg_path)
 timer.reset()
 widget_layout = {
-    "input_dialog":         ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
+    "TitleLabel":           ["Label", "TurnH264",          "Left", "NO_HIDE", (0, 0, 1, 1)],
+    "help_button":          ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (0, 4, 1, 1)],
+    "input_dialog":         ["Label", "Input video:",      "Left", "YE_HIDE", (1, 0, 1, 1)],
     "input_text":           ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
     "input_button":         ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
-    "help_button":          ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
-    "output_dialog":        ["Label", "Output:",         "Center", "YE_HIDE", (2, 0, 1, 1)],
+    "output_dialog":        ["Label", "Output:",           "Left", "YE_HIDE", (2, 0, 1, 1)],
     "output_text_input":    ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
     "outputDrop":           ["ComboBox",                   "Left", "YE_HIDE", (2, 3, 1, 2)],
 
-    "v_bitrate_dialog":     ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
+    "v_bitrate_dialog":     ["Label", "Video bitrate:",    "Left", "YE_HIDE", (3, 0, 1, 1)],
     "video_bitrate":        ["LineEdit",                   "Left", "YE_HIDE", (3, 1, 1, 2)],
     "videoDrop":            ["ComboBox",                   "Left", "YE_HIDE", (3, 3, 1, 2)],
-    "a_bitrate_dialog":     ["Label", "Audio bitrate:",  "Center", "YE_HIDE", (4, 0, 1, 1)],
+    "a_bitrate_dialog":     ["Label", "Audio bitrate:",    "Left", "YE_HIDE", (4, 0, 1, 1)],
     "audio_bitrate_slider": ["Slider",      "Horizontal",  "Left", "YE_HIDE", (4, 1, 1, 2)],
     "audio_bitrate_input":  ["LineEdit",                   "Left", "YE_HIDE", (4, 1, 1, 2)],
     "audioDrop":            ["ComboBox",                   "Left", "YE_HIDE", (4, 3, 1, 2)],
-    "threads_dialog":       ["Label", "Threads:",        "Center", "YE_HIDE", (5, 0, 1, 1)],
+    "threads_dialog":       ["Label", "Threads:",          "Left", "YE_HIDE", (5, 0, 1, 1)],
     "thread":               ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
-    "threads_dialog_ratio": ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
-    "speed_dialog":         ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
+    "threads_dialog_ratio": ["Label", "",                  "Left", "YE_HIDE", (5, 3, 1, 2)],
+    "speed_dialog":         ["Label", "Speed:",            "Left", "YE_HIDE", (6, 0, 1, 1)],
     "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
-    "fps_dialog":           ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
+    "fps_dialog":           ["Label", "fps:",              "Left", "YE_HIDE", (7, 0, 1, 1)],
     "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
     "res_dialog":           ["Label", "resolution:",       "Left", "YE_HIDE", (8, 0, 1, 1)],
     "res_line":             ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
@@ -80,7 +81,8 @@ class MainWindow(QtWidgets.QWidget):
                 self.work_button.setEnabled(True)
 
             timer.print("ffmpeg not detected, downloading...")
-            ffmpeg_paths_thread = threading.Thread(target=ffmpeg_utils.download)
+            ffmpeg_paths_thread = threading.Thread(
+                target=ffmpeg_utils.download)
             ffmpeg_paths_thread.start()
             ffmpeg_paths_wait = threading.Thread(target=wait_for_ffmpeg)
             ffmpeg_paths_wait.start()
@@ -124,7 +126,6 @@ class MainWindow(QtWidgets.QWidget):
         self.resDrop.currentTextChanged.connect(self.resDropChanged)
         self.thread.valueChanged.connect(self.threadChanged)
         self.work_button.clicked.connect(self.workClicked)
-        self.yes_button.clicked.connect(self.yesClicked)
         self.no_button.clicked.connect(self.noClicked)
         self.fps.textChanged.connect(self.inputChanged)
         timer.print("widgets connected")
@@ -155,6 +156,7 @@ class MainWindow(QtWidgets.QWidget):
         for i in widget_layout:
             if widget_layout[i][-2] == "YE_HIDE":
                 exec(f"self.{i}.setEnabled(bool({num}))")
+
     def inputChanged(self):
         self.input_text.setText(self.input_text.text().replace("\"", ""))
         if self.input_text.text() != "":

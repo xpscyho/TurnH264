@@ -1,8 +1,8 @@
 # To H264: A simple GUI program that converts video into H264 using FFmpeg.
 
 <p align=center>
-<img src="images/Screenshot.png"/>
-<img src="images/Screenshot_windows.png"/>
+<img src="Screenshot.png"/>
+<img src="Screenshot_windows.png"/>
 </p>
 
 ---

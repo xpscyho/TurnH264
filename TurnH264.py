@@ -13,8 +13,7 @@ from PySide6 import QtGui, QtWidgets
 # this is used, but run in exec so they are shown as unused (at least in MY IDE)
 from PySide6.QtCore import Qt
 
-from utilities import ffmpeg_utils, printProgressBar, timer
-
+from utilities import timer, ffmpeg_utils, progressBar
 # print(ffmpeg_path)
 timer.reset()
 widget_layout = {
@@ -361,8 +360,7 @@ class MainWindow(QtWidgets.QWidget):
                         " / "+str(video_frame_total),
                         line_dict['fps']+" fps",
                         "speed: " + line_dict['speed'],
-                        "\n"+printProgressBar(printing=False, total=video_frame_total, length=50,
-                                              iteration=int(line_dict['frame']), color=False, nullp=".", fill="!", end=""),
+                        "\n"+progressBar(int(line_dict['frame']), video_frame_total, length=50, color=False, nullp=".", fill="!", end=""),
                         str(round(
                             (int(line_dict['frame'])
                              / video_frame_total)*100, 2))+"%",

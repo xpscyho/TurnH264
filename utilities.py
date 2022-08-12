@@ -1,3 +1,4 @@
+
 import json
 import os
 import shutil
@@ -7,6 +8,7 @@ import tarfile
 import threading
 import time
 import zipfile
+from os.path import exists
 
 import requests
 
@@ -40,76 +42,80 @@ class timer:  # timer setup ####
 
 
 # custom progress bar (slightly modified) [https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console]
-def printProgressBar(
-    printing=True, iteration=0, total=1000, length=100, fill="#", nullp="-", color=True, end="\r"
-):
-    """
-    iteration   - Required  : current iteration (Int)
-    total       - Required  : total iterations (Int)
-    length      - Optional  : character length of bar (Int)
-    fill        - Optional  : bar fill character (Str)
-    """
-    color1 = "\033[93m"
-    color2 = "\033[92m"
-    filledLength = int(length * iteration // total)
-    # doing this allows for multi-character fill
-    # like this: <!i!i!i!i!i!.......................................>
-    fill = (fill*length)[:filledLength]
-    nullp = (nullp*(length - filledLength))
-    bar = fill + nullp
-    command = f"{color2}<{color1}{bar}{color2}>\033[0m" if color else f"<{bar}>"
-    if printing:
+def progressBar(iteration: int, total: int, length: int = max(os.get_terminal_size()[0]//6, 10),
+                Print=False, fill="#", nullp="-", corner="[]", color=True,
+                end="\r", pref='', suff=''):
+    color1, color2 = "\033[93m", "\033[92m"
+    filledLength = length * iteration // total
+
+    #    [############################# --------------------------------]
+    bar = (fill*length)[:filledLength] + (nullp*(length - filledLength))
+    command = f"\033[K{color2}{corner[0]}{color1}{bar}{color2}{corner[1]}\033[0m" if color else f"{corner[0]}{bar}{corner[1]}"
+    command = pref+command+suff
+    if Print:
         print(command, end=end)
-    if iteration == total:
-        print()
     return command
 
 
 class ffmpeg_utils():
+    def basename(path):
+        return path.rsplit(os.sep, 1)[-1]
+
+    def dirname(path):
+        return path.rsplit(os.sep, 1)[0]
+
+    def extension(path):
+        return path.rsplit(".", 1)[-1]
+
     def get_ffmpeg():
         name = {"linux": ["ffmpeg", "ffprobe"],
                 "win32": ["ffmpeg.exe", "ffprobe.exe"]}
-        local_ffmpeg = os.path.dirname(os.path.realpath(
-            __file__)) + "/"+name[sys.platform][0]
-        local_ffprobe = os.path.dirname(
-            os.path.realpath(__file__)) + "/"+name[sys.platform][1]
-        local_ffmpeg = local_ffmpeg if os.path.exists(
-        local_ffmpeg) else name[sys.platform][0]
-        local_ffprobe = local_ffprobe if os.path.exists(
-            local_ffprobe) else name[sys.platform][1]
-        ffmpeg_paths = [local_ffmpeg, local_ffprobe]
+        origin = ffmpeg_utils.dirname(os.path.realpath(__file__))
+        cwd = os.getcwd()
+        os.chdir(origin)
+        locFfmpeg = os.path.join(origin, name[sys.platform][0])
+        locFfprob = os.path.join(origin, name[sys.platform][1])
+
+        #* comment this out to test download() if not on PATH ###############
+        # locFfmpeg = locFfmpeg if exists(locFfmpeg) else name[sys.platform][0]
+        # locFfprob = locFfprob if exists(locFfprob) else name[sys.platform][1]
+        #*###################################################################
+
+        ffmpeg_paths = [locFfmpeg, locFfprob]
+
+        # check if ffmpeg is accessible to subprocess
         try:
-            ffmptest = subprocess.Popen([local_ffmpeg, "-version"],
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            ffprtest = subprocess.Popen([local_ffprobe, "-version"],
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.Popen([locFfmpeg, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.Popen([locFfprob, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except:
-            return 1
-            timer.print("ffmpeg not detected, obtaining ffmpeg...")
-            ffmpeg_paths_thread = threading.Thread(
-                target=ffmpeg_utils.download)
-            ffmpeg_paths_thread.start()
+            print("\033[33;1mffmpeg not detected, obtaining ffmpeg...")
+            # ffmpeg_paths_thread = threading.Thread(
+            #     target=ffmpeg_utils.download)
+            # ffmpeg_paths_thread.start()
+            ffmpeg_paths = ffmpeg_utils.download()
+        os.chdir(cwd)
+        
         return ffmpeg_paths
 
     def download():
         ffmpeg_links = {"linux": ["curl", "-s", "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"],
-                        "win32": ["curl", "-s", "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"],
-                        # "macos": ["curl", "-s", "https://evermeet.cx/ffmpeg/info/ffprobe/snapshot"]
-                        }
+                        "win32": ["curl", "-s", "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"]}
+        #               "macos": ["curl", "-s", "https://evermeet.cx/ffmpeg/info/ffprobe/snapshot"]
         ffdl = {}
 
         if sys.platform == "linux":
+            timer.print("  getting JSON...")
             ffdl['out'] = subprocess.check_output(ffmpeg_links['linux'])
             ffdl['json'] = json.loads(ffdl['out'])
             ffdl['url'] = ffdl['json']['assets'][1]['browser_download_url']
-            timer.poll("  downloading...")
+            timer.print("  downloading...")
             ffdl['data'] = requests.get(ffdl['url'])
             open("ffmpeg.tar.xz", "wb").write(ffdl['data'].content)
-            timer.poll("  extracting...")
+            timer.print("  extracting...")
             with tarfile.open('ffmpeg.tar.xz') as f:
                 f.extract("ffmpeg-master-latest-linux64-gpl/bin/ffmpeg")
                 f.extract("ffmpeg-master-latest-linux64-gpl/bin/ffprobe")
-                timer.poll("  moving...")
+                timer.print("  moving...")
                 shutil.move("ffmpeg-master-latest-linux64-gpl/bin/ffmpeg",
                             "ffmpeg")
                 shutil.move("ffmpeg-master-latest-linux64-gpl/bin/ffprobe",
@@ -117,6 +123,7 @@ class ffmpeg_utils():
                 shutil.rmtree("ffmpeg-master-latest-linux64-gpl")
                 os.remove("ffmpeg.tar.xz")
             del ffdl
+            print("\033[0m", end="")
             return ["./ffmpeg", "./ffprobe"]
         if sys.platform == "win32":
             ffdl['out'] = subprocess.check_output(ffmpeg_links['win32'])
@@ -137,3 +144,7 @@ class ffmpeg_utils():
                 os.remove("ffmpeg.zip")
             del ffdl
             return ["./ffmpeg.exe", ".ffprobe.exe"]
+
+
+if __name__ == "__main__":
+    ffmpeg_utils.get_ffmpeg()

@@ -85,8 +85,10 @@ class ffmpeg_utils():
 
         # check if ffmpeg is accessible to subprocess
         try:
-            subprocess.Popen([locFfmpeg, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            subprocess.Popen([locFfprob, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.Popen([locFfmpeg, "-version"],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.Popen([locFfprob, "-version"],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except:
             print("\033[33;1mffmpeg not detected, obtaining ffmpeg...")
             # ffmpeg_paths_thread = threading.Thread(
@@ -94,7 +96,7 @@ class ffmpeg_utils():
             # ffmpeg_paths_thread.start()
             ffmpeg_paths = ffmpeg_utils.download()
         os.chdir(cwd)
-        
+
         return ffmpeg_paths
 
     def download():
@@ -102,24 +104,19 @@ class ffmpeg_utils():
                         "win32": ["curl", "-s", "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"]}
         #               "macos": ["curl", "-s", "https://evermeet.cx/ffmpeg/info/ffprobe/snapshot"]
         ffdl = {}
-
         if sys.platform == "linux":
             timer.print("  getting JSON...")
             ffdl['out'] = subprocess.check_output(ffmpeg_links['linux'])
             ffdl['json'] = json.loads(ffdl['out'])
             ffdl['url'] = ffdl['json']['assets'][1]['browser_download_url']
             timer.print("  downloading...")
-            ffdl['data'] = requests.get(ffdl['url'])
-            open("ffmpeg.tar.xz", "wb").write(ffdl['data'].content)
+            open("ffmpeg.tar.xz", "wb").write(requests.get(ffdl['url']).content)
             timer.print("  extracting...")
             with tarfile.open('ffmpeg.tar.xz') as f:
-                f.extract("ffmpeg-master-latest-linux64-gpl/bin/ffmpeg")
-                f.extract("ffmpeg-master-latest-linux64-gpl/bin/ffprobe")
-                timer.print("  moving...")
-                shutil.move("ffmpeg-master-latest-linux64-gpl/bin/ffmpeg",
-                            "ffmpeg")
-                shutil.move("ffmpeg-master-latest-linux64-gpl/bin/ffprobe",
-                            "ffprobe")
+                for ff in ['ffmpeg', 'ffprobe']:
+                    f.extract(f"ffmpeg-master-latest-linux64-gpl/bin/{ff}")
+                    shutil.move(
+                        f"ffmpeg-master-latest-linux64-gpl/bin/{ff}", f"{ff}")
                 shutil.rmtree("ffmpeg-master-latest-linux64-gpl")
                 os.remove("ffmpeg.tar.xz")
             del ffdl
@@ -130,19 +127,17 @@ class ffmpeg_utils():
             ffdl['json'] = json.loads(ffdl['out'])
             ffdl['url'] = ffdl['json']['assets'][5]['browser_download_url']
             timer.poll("downloading...")
-            ffdl['data'] = requests.get(ffdl['url'])
-            open("ffmpeg.zip", "wb").write(ffdl['data'].content)
+            open("ffmpeg.zip", "wb").write(requests.get(ffdl['url']).content)
             timer.poll("extracting...")
             with zipfile.ZipFile('ffmpeg.zip', 'r') as f:
-                f.extract("ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe")
-                f.extract("ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe")
-                shutil.move("ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe",
-                            "ffmpeg.exe")
-                shutil.move("ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe",
-                            "ffprobe.exe")
+                for ff in ['ffmpeg', 'ffprobe']:
+                    f.extract(f"ffmpeg-master-latest-win64-gpl/bin/{ff}")
+                    shutil.move(
+                        f"ffmpeg-master-latest-win64-gpl/bin/{ff}", f"{ff}")
                 shutil.rmtree("ffmpeg-master-latest-win64-gpl")
                 os.remove("ffmpeg.zip")
             del ffdl
+            print("\033[0m", end="")
             return ["./ffmpeg.exe", ".ffprobe.exe"]
 
 

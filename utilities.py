@@ -77,8 +77,8 @@ class ffmpeg_utils():
         locFfprob = os.path.join(origin, name[sys.platform][1])
 
         #* comment this out to test download() if not on PATH ###############
-        # locFfmpeg = locFfmpeg if exists(locFfmpeg) else name[sys.platform][0]
-        # locFfprob = locFfprob if exists(locFfprob) else name[sys.platform][1]
+        locFfmpeg = locFfmpeg if exists(locFfmpeg) else name[sys.platform][0]
+        locFfprob = locFfprob if exists(locFfprob) else name[sys.platform][1]
         #*###################################################################
 
         ffmpeg_paths = [locFfmpeg, locFfprob]

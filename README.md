@@ -41,7 +41,7 @@ otherwise:
 
 -   [x] Add a progress bar
 -   [ ] NVENC and VCE
--   [ ] automatically install ffmpeg if not detected
+-   [x] automatically install ffmpeg if not detected
 
 ---
 

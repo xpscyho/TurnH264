@@ -95,6 +95,7 @@ class ffmpeg_utils():
             #     target=ffmpeg_utils.download)
             # ffmpeg_paths_thread.start()
             ffmpeg_paths = ffmpeg_utils.download()
+            print("Done.")
         os.chdir(cwd)
 
         return ffmpeg_paths
@@ -110,7 +111,8 @@ class ffmpeg_utils():
             ffdl['json'] = json.loads(ffdl['out'])
             ffdl['url'] = ffdl['json']['assets'][1]['browser_download_url']
             timer.print("  downloading...")
-            open("ffmpeg.tar.xz", "wb").write(requests.get(ffdl['url']).content)
+            open("ffmpeg.tar.xz", "wb").write(
+                requests.get(ffdl['url']).content)
             timer.print("  extracting...")
             with tarfile.open('ffmpeg.tar.xz') as f:
                 for ff in ['ffmpeg', 'ffprobe']:

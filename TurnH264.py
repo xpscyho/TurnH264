@@ -17,12 +17,12 @@ from utilities import timer, ffmpeg_utils, progressBar
 # print(ffmpeg_path)
 timer.reset()
 widget_layout = {
-    "input_dialog":         ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
-    "input_text":           ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
-    "input_button":         ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
-    "help_button":          ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
-    "output_dialog":        ["Label", "Output:",         "Center", "YE_HIDE", (2, 0, 1, 1)],
-    "output_text_input":    ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
+    "inputDlg":         ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
+    "inputText":           ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
+    "inputButton":         ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
+    "helpButton":          ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
+    "outputDlg":        ["Label", "Output:",         "Center", "YE_HIDE", (2, 0, 1, 1)],
+    "outputInput":    ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
     "outputDrop":           ["ComboBox",                   "Left", "YE_HIDE", (2, 3, 1, 2)],
 
     "v_bitrate_dialog":     ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
@@ -66,7 +66,7 @@ class MainWindow(QtWidgets.QWidget):
         super(MainWindow, self).__init__()
         timer.print("Starting")
         self.setWindowTitle("TurnH264")
-        self.resize(320, 340)
+        self.resize(400, 400)
         self.setMinimumSize(320, 260)
         self.addWidgets()
         self.stopped_preemptively = False
@@ -116,8 +116,8 @@ class MainWindow(QtWidgets.QWidget):
 
         timer.print("Widgets created")
         self.changeButtons(0)
-        self.input_text.textChanged.connect(self.inputChanged)
-        self.input_button.clicked.connect(self.inputButtonClicked)
+        self.inputText.textChanged.connect(self.inputChanged)
+        self.inputButton.clicked.connect(self.inputButtonClicked)
         self.outputDrop.currentTextChanged.connect(self.inputChanged)
         self.audioDrop.currentTextChanged.connect(self.audioDropChanged)
         self.resDrop.currentTextChanged.connect(self.resDropChanged)
@@ -148,35 +148,35 @@ class MainWindow(QtWidgets.QWidget):
             self.yes_button.setVisible(True)
 
     def realOutput(self):
-        return self.output_text_input.text().replace("%Input_Path%", os.path.dirname(self.input_text.text()))
+        return self.outputInput.text().replace("%Input_Path%", os.path.dirname(self.inputText.text()))
 
     def WidgetsEditable(self, num):
         for i in widget_layout:
             if widget_layout[i][-2] == "YE_HIDE":
                 exec(f"self.{i}.setEnabled(bool({num}))")
     def inputChanged(self):
-        self.input_text.setText(self.input_text.text().replace("\"", ""))
-        if self.input_text.text() != "":
+        self.inputText.setText(self.inputText.text().replace("\"", ""))
+        if self.inputText.text() != "":
             text = "".join([
                 "%Input_Path%/",  # input path
-                os.path.basename(self.input_text.text()).split(".")[0],
+                os.path.basename(self.inputText.text()).split(".")[0],
                 "-converted",
                 (f"-{self.fps.text()}fps" if self.fps.text() != "" else "")
             ])
             now_extension = self.outputDrop.currentText()
             text = os.path.join(
                 text, "%06d.png") if now_extension == "png" else text+"."+now_extension
-            self.output_text_input.setText(text)
+            self.outputInput.setText(text)
         else:
-            self.output_text_input.setText("")
-        self.output_text_input.update()
+            self.outputInput.setText("")
+        self.outputInput.update()
 
     def inputButtonClicked(self):
         home = str("c:\\users\\" if sys.platform == "win32" else
                    os.path.expanduser("~"))
         file = QtWidgets.QFileDialog.getOpenFileName(
             self, "Select input file", home)[0]
-        self.input_text.setText(file)
+        self.inputText.setText(file)
 
     def audioDropChanged(self):
         """ copy = 0, slider = 1, input = 2"""
@@ -236,7 +236,7 @@ class MainWindow(QtWidgets.QWidget):
         reses = {}
         reses['input_res'] = [int(val.split("=")[1]) for val in subprocess.check_output(
                              [self.ffmpeg_path[1], '-v', 'error', '-show_entries', 'stream=width,height',
-                              '-of', 'default=noprint_wrappers=1', self.input_text.text()]).
+                              '-of', 'default=noprint_wrappers=1', self.inputText.text()]).
                               decode("utf-8").split("\n")[:-1]]
         reses['res_line'] = int(self.res_line.text()
                                 if self.res_line.text() != "" else 0)
@@ -252,7 +252,7 @@ class MainWindow(QtWidgets.QWidget):
         reses['new_res'] = [math.floor(val)-(math.floor(val) % 2)
                             for val in reses['new_res']]
         ffargs = {"path": self.ffmpeg_path[0],
-                  "input":   ['-i', self.input_text.text()],
+                  "input":   ['-i', self.inputText.text()],
                   "output":  self.realOutput(),
                   "extension": self.outputDrop.currentText(),
                   "vidbr":   "".join([val for val in self.video_bitrate.text() if val.isnumeric()]),
@@ -268,7 +268,7 @@ class MainWindow(QtWidgets.QWidget):
             if not os.path.exists(os.path.dirname(ffargs['output'])):
                 os.mkdir(os.path.dirname(ffargs['output']))
         # tmpdir for progress bar
-        tmpdir = self.input_text.text() + '.tmp'
+        tmpdir = self.inputText.text() + '.tmp'
         if os.path.exists(tmpdir):
             os.remove(tmpdir)
         tmpfile = open(tmpdir, "w")
@@ -340,7 +340,7 @@ class MainWindow(QtWidgets.QWidget):
             video_frame = subprocess.check_output([
                 "ffprobe", "-v", "error", "-select_streams", "v:0",
                 "-count_frames", "-show_entries", "stream=nb_read_frames",
-                "-print_format", "csv", "-i", self.input_text.text()])
+                "-print_format", "csv", "-i", self.inputText.text()])
 
             video_frame_total = video_frame.decode("utf-8").strip()
             video_frame_total = int(
@@ -383,7 +383,7 @@ class MainWindow(QtWidgets.QWidget):
         self.ffmpegWaitThread.start()
 
     def workClicked(self):
-        input_file = self.input_text.text()
+        input_file = self.inputText.text()
         work_step = self.work_button.text()
         if self.status_dialog.text() == "Awaiting input":
             self.stopped_preemptively = False

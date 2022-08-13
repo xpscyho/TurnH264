@@ -125,6 +125,7 @@ class ffmpeg_utils():
             print("\033[0m", end="")
             return ["./ffmpeg", "./ffprobe"]
         if sys.platform == "win32":
+            timer.print("  getting JSON...")
             ffdl['out'] = subprocess.check_output(ffmpeg_links['win32'])
             ffdl['json'] = json.loads(ffdl['out'])
             ffdl['url'] = ffdl['json']['assets'][5]['browser_download_url']

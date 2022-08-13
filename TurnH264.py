@@ -39,7 +39,7 @@ widget_layout = {
     "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
     "fpsDlg":               ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
     "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
-    "resDlg":               ["Label", "resolution:",       "Left", "YE_HIDE", (8, 0, 1, 1)],
+    "resDlg":               ["Label", "resolution:",     "Center", "YE_HIDE", (8, 0, 1, 1)],
     "resLine":              ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
     "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
 

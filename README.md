@@ -1,7 +1,7 @@
 # TurnH264: A simple GUI program that converts video into H264 using FFmpeg.
 
 <p align=center>
-<img src="readme/Screenshot.png"/>
+<img src="readme/Screenshot_linux.png"/>
 <img src="readme/Screenshot_windows.png"/>
 </p>
 

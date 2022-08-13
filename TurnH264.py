@@ -17,45 +17,45 @@ from utilities import timer, ffmpeg_utils, progressBar
 # print(ffmpeg_path)
 timer.reset()
 widget_layout = {
-    "inputDlg":         ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
-    "inputText":           ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
-    "inputButton":         ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
-    "helpButton":          ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
-    "outputDlg":        ["Label", "Output:",         "Center", "YE_HIDE", (2, 0, 1, 1)],
-    "outputInput":    ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
+    "inputDlg":             ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
+    "inputText":            ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
+    "inputButton":          ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
+    "helpButton":           ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
+    "outputDlg":            ["Label", "Output:",         "Center", "YE_HIDE", (2, 0, 1, 1)],
+    "outputInput":          ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
     "outputDrop":           ["ComboBox",                   "Left", "YE_HIDE", (2, 3, 1, 2)],
 
-    "v_bitrate_dialog":     ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
-    "video_bitrate":        ["LineEdit",                   "Left", "YE_HIDE", (3, 1, 1, 2)],
-    "videoDrop":            ["ComboBox",                   "Left", "YE_HIDE", (3, 3, 1, 2)],
-    "a_bitrate_dialog":     ["Label", "Audio bitrate:",  "Center", "YE_HIDE", (4, 0, 1, 1)],
-    "audio_bitrate_slider": ["Slider",      "Horizontal",  "Left", "YE_HIDE", (4, 1, 1, 2)],
-    "audio_bitrate_input":  ["LineEdit",                   "Left", "YE_HIDE", (4, 1, 1, 2)],
+    "vBitrateDlg":     ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
+    "vBitrate":        ["LineEdit",                   "Left", "YE_HIDE", (3, 1, 1, 2)],
+    "vDrop":            ["ComboBox",                   "Left", "YE_HIDE", (3, 3, 1, 2)],
+    "aBitrateDlg":     ["Label", "Audio bitrate:",  "Center", "YE_HIDE", (4, 0, 1, 1)],
+    "aBitrateSli": ["Slider",      "Horizontal",  "Left", "YE_HIDE", (4, 1, 1, 2)],
+    "aBitrateInput":  ["LineEdit",                   "Left", "YE_HIDE", (4, 1, 1, 2)],
     "audioDrop":            ["ComboBox",                   "Left", "YE_HIDE", (4, 3, 1, 2)],
-    "threads_dialog":       ["Label", "Threads:",        "Center", "YE_HIDE", (5, 0, 1, 1)],
-    "thread":               ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
-    "threads_dialog_ratio": ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
-    "speed_dialog":         ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
+    "threadsDlg":       ["Label", "Threads:",        "Center", "YE_HIDE", (5, 0, 1, 1)],
+    "threads":               ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
+    "threadsDlgRatio": ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
+    "speedDialog":         ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
     "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
-    "fps_dialog":           ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
+    "fpsDlg":           ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
     "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
-    "res_dialog":           ["Label", "resolution:",       "Left", "YE_HIDE", (8, 0, 1, 1)],
-    "res_line":             ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
+    "resDlg":           ["Label", "resolution:",       "Left", "YE_HIDE", (8, 0, 1, 1)],
+    "resLine":             ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
     "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
 
-    "status_dialog":        ["Label", "Awaiting input",  "Center", "NO_HIDE", (9, 0, 1, 5)],
-    "work_button":          ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
-    "yes_button":           ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
-    "no_button":            ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)],
+    "statDlg":        ["Label", "Awaiting input",  "Center", "NO_HIDE", (9, 0, 1, 5)],
+    "workButton":          ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
+    "yesButton":           ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
+    "noButton":            ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)],
 }
 widget_boxes = {
-    "audio_bitrate_slider": [1, 8, 0.75],
-    "thread":               [1, os.cpu_count(), 0.75],
+    "aBitrateSli": [1, 8, 0.75],
+    "threads":               [1, os.cpu_count(), 0.75],
     "speedDrop":            ["veryslow", "slower", "slow",
                              "medium",   "fast",   "faster",
                              "veryfast", "ultrafast"],
     "outputDrop":           ["mp4", "mkv", "avi", "ts", "png"],
-    "videoDrop":            ["kb/s", "crf"],
+    "vDrop":            ["kb/s", "crf"],
     "audioDrop":            ["copy", "slider", "input", "none"],
     "resDrop":              ["copy", "max", "min"],
 }
@@ -70,22 +70,6 @@ class MainWindow(QtWidgets.QWidget):
         self.setMinimumSize(320, 260)
         self.addWidgets()
         self.stopped_preemptively = False
-        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
-        if self.ffmpeg_path == 1:
-            def wait_for_ffmpeg():
-                ffmpeg_paths_thread.join()
-                self.status_dialog.setText("Awaiting input")
-                self.WidgetsEditable(1)
-                self.work_button.setEnabled(True)
-
-            timer.print("ffmpeg not detected, downloading...")
-            ffmpeg_paths_thread = threading.Thread(target=ffmpeg_utils.download)
-            ffmpeg_paths_thread.start()
-            ffmpeg_paths_wait = threading.Thread(target=wait_for_ffmpeg)
-            ffmpeg_paths_wait.start()
-            self.status_dialog.setText("ffmpeg not detected, downloading...")
-            self.WidgetsEditable(0)
-            self.work_button.setEnabled(False)
         self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
 
     def addWidgets(self):
@@ -113,18 +97,16 @@ class MainWindow(QtWidgets.QWidget):
                 exec(f"self.layout.addWidget({given}, {layout[0]}, \
                       {layout[1]}, {layout[2]}, {layout[3]})")  # apply layout
         parse_layout(widget_layout)
-
-        timer.print("Widgets created")
         self.changeButtons(0)
         self.inputText.textChanged.connect(self.inputChanged)
         self.inputButton.clicked.connect(self.inputButtonClicked)
         self.outputDrop.currentTextChanged.connect(self.inputChanged)
         self.audioDrop.currentTextChanged.connect(self.audioDropChanged)
         self.resDrop.currentTextChanged.connect(self.resDropChanged)
-        self.thread.valueChanged.connect(self.threadChanged)
-        self.work_button.clicked.connect(self.workClicked)
-        self.yes_button.clicked.connect(self.yesClicked)
-        self.no_button.clicked.connect(self.noClicked)
+        self.threads.valueChanged.connect(self.threadChanged)
+        self.workButton.clicked.connect(self.workClicked)
+        self.yesButton.clicked.connect(self.yesClicked)
+        self.noButton.clicked.connect(self.noClicked)
         self.fps.textChanged.connect(self.inputChanged)
         timer.print("widgets connected")
         self.speedDrop.setCurrentIndex(3)
@@ -135,17 +117,17 @@ class MainWindow(QtWidgets.QWidget):
 
     def changeButtons(self, num):
         '''0 = Start, 1 = Stop, 2 = Yes/No dialog'''
-        self.work_button.setVisible(True)
-        self.yes_button.setVisible(False)
-        self.no_button.setVisible(False)
+        self.workButton.setVisible(True)
+        self.yesButton.setVisible(False)
+        self.noButton.setVisible(False)
         if num == 0:
-            self.work_button.setText("Start")
+            self.workButton.setText("Start")
         if num == 1:
-            self.work_button.setText("Stop")
+            self.workButton.setText("Stop")
         if num == 2:
-            self.work_button.setVisible(False)
-            self.no_button.setVisible(True)
-            self.yes_button.setVisible(True)
+            self.workButton.setVisible(False)
+            self.noButton.setVisible(True)
+            self.yesButton.setVisible(True)
 
     def realOutput(self):
         return self.outputInput.text().replace("%Input_Path%", os.path.dirname(self.inputText.text()))
@@ -154,6 +136,7 @@ class MainWindow(QtWidgets.QWidget):
         for i in widget_layout:
             if widget_layout[i][-2] == "YE_HIDE":
                 exec(f"self.{i}.setEnabled(bool({num}))")
+
     def inputChanged(self):
         self.inputText.setText(self.inputText.text().replace("\"", ""))
         if self.inputText.text() != "":
@@ -183,21 +166,21 @@ class MainWindow(QtWidgets.QWidget):
         index = self.audioDrop.currentIndex()
         audio_dict = ([False, False], [False, True],
                       [True, False], [False, False])
-        self.audio_bitrate_input.setVisible(audio_dict[index][0])
-        self.audio_bitrate_slider.setVisible(audio_dict[index][1])
+        self.aBitrateInput.setVisible(audio_dict[index][0])
+        self.aBitrateSli.setVisible(audio_dict[index][1])
 
     def resDropChanged(self):
         index = self.resDrop.currentIndex()
-        self.res_line.setVisible(bool(index))
+        self.resLine.setVisible(bool(index))
 
     def threadChanged(self):
-        self.threads_dialog_ratio.setText(
-            f"{str(self.thread.value()).zfill(len(str(os.cpu_count())))} / {os.cpu_count()}")
-        self.threads_dialog_ratio.update()
+        self.threadsDlgRatio.setText(
+            f"{str(self.threads.value()).zfill(len(str(os.cpu_count())))} / {os.cpu_count()}")
+        self.threadsDlgRatio.update()
 
     def noClicked(self):
-        self.status_dialog.setText("Awaiting input")
-        self.work_button.setText("Start")
+        self.statDlg.setText("Awaiting input")
+        self.workButton.setText("Start")
         self.WidgetsEditable(1)
         self.changeButtons(0)
 
@@ -226,10 +209,10 @@ class MainWindow(QtWidgets.QWidget):
             return f"N/A{suffix}"
 
     def startFfmpeg(self):
-        self.status_dialog.setText("Converting...")
+        self.statDlg.setText("Converting...")
         timer.reset()
 
-        vindex = self.videoDrop.currentIndex()
+        vindex = self.vDrop.currentIndex()
         aindex = self.audioDrop.currentIndex()
         rindex = self.resDrop.currentIndex()
     # handle resolutions
@@ -238,15 +221,15 @@ class MainWindow(QtWidgets.QWidget):
                              [self.ffmpeg_path[1], '-v', 'error', '-show_entries', 'stream=width,height',
                               '-of', 'default=noprint_wrappers=1', self.inputText.text()]).
                               decode("utf-8").split("\n")[:-1]]
-        reses['res_line'] = int(self.res_line.text()
-                                if self.res_line.text() != "" else 0)
-        reses['restio'] = (reses['res_line']/max(reses['input_res']) if rindex ==
-                           1 else reses['res_line']/min(reses['input_res']) if rindex == 2 else 1)
+        reses['resLine'] = int(self.resLine.text()
+                               if self.resLine.text() != "" else 0)
+        reses['restio'] = (reses['resLine']/max(reses['input_res']) if rindex ==
+                           1 else reses['resLine']/min(reses['input_res']) if rindex == 2 else 1)
         reses['new_res'] = [val*reses['restio'] for val in reses['input_res']]
         timer.print(reses['input_res'])
         if type(reses['new_res'][0]) != int:
             if not reses['new_res'][0].is_integer() or not reses['new_res'][1].is_integer():
-                self.status_dialog.setText(
+                self.statDlg.setText(
                     "Warning: the specified resolution is not an int.\nresult may be imprecise")
                 timer.print(f"{reses['new_res']} is imprecise, flooring...")
         reses['new_res'] = [math.floor(val)-(math.floor(val) % 2)
@@ -255,10 +238,10 @@ class MainWindow(QtWidgets.QWidget):
                   "input":   ['-i', self.inputText.text()],
                   "output":  self.realOutput(),
                   "extension": self.outputDrop.currentText(),
-                  "vidbr":   "".join([val for val in self.video_bitrate.text() if val.isnumeric()]),
-                  "audbr_s": str(self.audio_bitrate_slider.value()*32)+"k",
-                  "audbr_i": self.audio_bitrate_input.text(),
-                  "threads": ['-threads', str(self.thread.value())],
+                  "vidbr":   "".join([val for val in self.vBitrate.text() if val.isnumeric()]),
+                  "audbr_s": str(self.aBitrateSli.value()*32)+"k",
+                  "audbr_i": self.aBitrateInput.text(),
+                  "threads": ['-threads', str(self.threads.value())],
                   "speedDrop":   ['-preset', self.speedDrop.currentText()],
                   "fps":     "".join([val for val in self.fps.text() if val.isnumeric()]),
                   "scale":      f"{reses['new_res'][0]}:{reses['new_res'][1]}"
@@ -316,7 +299,7 @@ class MainWindow(QtWidgets.QWidget):
             timer.print("\nkilled ffmpeg")
             self.stopped_preemptively = True
             self.WidgetsEditable(0)
-            self.status_dialog.setText(
+            self.statDlg.setText(
                 "Conversion stopped. delete unfinished video?")
             self.changeButtons(2)
 
@@ -325,9 +308,9 @@ class MainWindow(QtWidgets.QWidget):
             with open(tmpdir, "r") as file:
                 lines = file.readlines()
                 timer.print("".join(lines[-12:]))
-            self.status_dialog.setText("Conversion complete!")
-            self.work_button.clicked.disconnect()
-            self.work_button.clicked.connect(self.workClicked)
+            self.statDlg.setText("Conversion complete!")
+            self.workButton.clicked.disconnect()
+            self.workButton.clicked.connect(self.workClicked)
             self.changeButtons(0)
             self.WidgetsEditable(1)
             timer.print("\nffmpeg finished")
@@ -360,7 +343,8 @@ class MainWindow(QtWidgets.QWidget):
                         " / "+str(video_frame_total),
                         line_dict['fps']+" fps",
                         "speed: " + line_dict['speed'],
-                        "\n"+progressBar(int(line_dict['frame']), video_frame_total, length=50, color=False, nullp=".", fill="!", end=""),
+                        "\n"+progressBar(int(line_dict['frame']), video_frame_total,
+                                         length=50, color=False, nullp=".", fill="!", end=""),
                         str(round(
                             (int(line_dict['frame'])
                              / video_frame_total)*100, 2))+"%",
@@ -368,14 +352,14 @@ class MainWindow(QtWidgets.QWidget):
                         "size: " + self.byteFormat(line_dict['total_size']),
                     ]
                     print(", ".join(used_list))
-                    self.status_dialog.setText(", ".join(used_list))
+                    self.statDlg.setText(", ".join(used_list))
                 file.close()
                 time.sleep(0.5)
 
         self.changeButtons(1)
         self.WidgetsEditable(0)
-        self.work_button.clicked.disconnect()
-        self.work_button.clicked.connect(ffmpegCancel)
+        self.workButton.clicked.disconnect()
+        self.workButton.clicked.connect(ffmpegCancel)
 
         self.ffmpegWaitThread = threading.Thread(target=ffmpegWait)
         self.ffmpegWatchThread = threading.Thread(target=ffmpegWatch)
@@ -384,18 +368,18 @@ class MainWindow(QtWidgets.QWidget):
 
     def workClicked(self):
         input_file = self.inputText.text()
-        work_step = self.work_button.text()
-        if self.status_dialog.text() == "Awaiting input":
+        work_step = self.workButton.text()
+        if self.statDlg.text() == "Awaiting input":
             self.stopped_preemptively = False
         if work_step == "Start":
             if not os.path.exists(input_file):
-                self.status_dialog.setText("Input file does not exist.")
+                self.statDlg.setText("Input file does not exist.")
                 print("File not found")
                 return
         ffmpeg_output = self.realOutput()
         if os.path.exists(ffmpeg_output):
             print(ffmpeg_output, "already exists.")
-            self.status_dialog.setText("Output already exists, overwrite?")
+            self.statDlg.setText("Output already exists, overwrite?")
             self.changeButtons(2)
             self.WidgetsEditable(0)
         else:

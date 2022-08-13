@@ -1,8 +1,8 @@
-# To H264: A simple GUI program that converts video into H264 using FFmpeg.
+# TurnH264: A simple GUI program that converts video into H264 using FFmpeg.
 
 <p align=center>
-<img src="Screenshot.png"/>
-<img src="Screenshot_windows.png"/>
+<img src="readme/Screenshot.png"/>
+<img src="readme/Screenshot_windows.png"/>
 </p>
 
 ---
@@ -13,7 +13,8 @@ Install PySide6: `pip install PySide6`
 
 if it's not globally installed, Place an `ffmpeg` executable in the same directory as `TurnH264.py`
 
-FFmpeg builds are available at https://www.ffmpeg.org/download.html
+FFmpeg builds are available at https://www.ffmpeg.org/download.html.
+
 Everything should work as intended.
 
 ### for MacOS users:
@@ -23,7 +24,7 @@ Please do note that this program is untested for macOS as neither me nor any of 
 ---
 
 ## Compilation:
-**DISCLAIMER: compilation is absolutely unnecessary to run this program.**
+**DISCLAIMER: compilation is unnecessary to run this program.**
 
 These commands must run on the OS that you want to compile for.
 
@@ -40,8 +41,8 @@ otherwise:
 ### Todo:
 
 -   [x] Add a progress bar
--   [ ] NVENC and VCE
 -   [x] automatically install ffmpeg if not detected
+-   [ ] NVENC and VCE
 
 ---
 

@@ -1,4 +1,4 @@
-requests
+wget
 opencv-python
 PySide6
 pyinstaller

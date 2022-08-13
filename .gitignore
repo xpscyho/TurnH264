@@ -2,6 +2,7 @@ build/
 dist/
 TurnH264-build/
 ffmpeg
+ffprobe
 TurnH264.spec
 .spec
 TurnH264-2.py

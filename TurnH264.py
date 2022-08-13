@@ -25,37 +25,37 @@ widget_layout = {
     "outputInput":          ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
     "outputDrop":           ["ComboBox",                   "Left", "YE_HIDE", (2, 3, 1, 2)],
 
-    "vBitrateDlg":     ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
-    "vBitrate":        ["LineEdit",                   "Left", "YE_HIDE", (3, 1, 1, 2)],
-    "vDrop":            ["ComboBox",                   "Left", "YE_HIDE", (3, 3, 1, 2)],
-    "aBitrateDlg":     ["Label", "Audio bitrate:",  "Center", "YE_HIDE", (4, 0, 1, 1)],
-    "aBitrateSli": ["Slider",      "Horizontal",  "Left", "YE_HIDE", (4, 1, 1, 2)],
-    "aBitrateInput":  ["LineEdit",                   "Left", "YE_HIDE", (4, 1, 1, 2)],
+    "vBitrateDlg":          ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
+    "vBitrate":             ["LineEdit",                   "Left", "YE_HIDE", (3, 1, 1, 2)],
+    "vDrop":                ["ComboBox",                   "Left", "YE_HIDE", (3, 3, 1, 2)],
+    "aBitrateDlg":          ["Label", "Audio bitrate:",  "Center", "YE_HIDE", (4, 0, 1, 1)],
+    "aBitrateSli":          ["Slider",      "Horizontal",  "Left", "YE_HIDE", (4, 1, 1, 2)],
+    "aBitrateInput":        ["LineEdit",                   "Left", "YE_HIDE", (4, 1, 1, 2)],
     "audioDrop":            ["ComboBox",                   "Left", "YE_HIDE", (4, 3, 1, 2)],
-    "threadsDlg":       ["Label", "Threads:",        "Center", "YE_HIDE", (5, 0, 1, 1)],
-    "threads":               ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
-    "threadsDlgRatio": ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
-    "speedDialog":         ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
+    "threadsDlg":           ["Label", "Threads:",        "Center", "YE_HIDE", (5, 0, 1, 1)],
+    "threads":              ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
+    "threadsDlgRatio":      ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
+    "speedDialog":          ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
     "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
-    "fpsDlg":           ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
+    "fpsDlg":               ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
     "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
-    "resDlg":           ["Label", "resolution:",       "Left", "YE_HIDE", (8, 0, 1, 1)],
-    "resLine":             ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
+    "resDlg":               ["Label", "resolution:",       "Left", "YE_HIDE", (8, 0, 1, 1)],
+    "resLine":              ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
     "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
 
-    "statDlg":        ["Label", "Awaiting input",  "Center", "NO_HIDE", (9, 0, 1, 5)],
-    "workButton":          ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
-    "yesButton":           ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
-    "noButton":            ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)],
+    "statDlg":              ["Label", "Awaiting input",  "Center", "NO_HIDE", (9, 0, 1, 5)],
+    "workButton":           ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
+    "yesButton":            ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
+    "noButton":             ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)],
 }
 widget_boxes = {
-    "aBitrateSli": [1, 8, 0.75],
-    "threads":               [1, os.cpu_count(), 0.75],
+    "aBitrateSli":          [1, 8, 0.75],
+    "threads":              [1, os.cpu_count(), 0.75],
     "speedDrop":            ["veryslow", "slower", "slow",
                              "medium",   "fast",   "faster",
                              "veryfast", "ultrafast"],
     "outputDrop":           ["mp4", "mkv", "avi", "ts", "png"],
-    "vDrop":            ["kb/s", "crf"],
+    "vDrop":                ["kb/s", "crf"],
     "audioDrop":            ["copy", "slider", "input", "none"],
     "resDrop":              ["copy", "max", "min"],
 }
@@ -70,7 +70,20 @@ class MainWindow(QtWidgets.QWidget):
         self.setMinimumSize(320, 260)
         self.addWidgets()
         self.stopped_preemptively = False
-        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
+        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg() # this is also called every time ffmpeg is run
+        if self.ffmpeg_path == None:  # ffmpeg wasn't found
+            self.workButton.setEnabled(False)
+            self.statDlg.setText("ffmpeg not detected, obtaining ffmpeg...")
+            self.getFfmpegThread = threading.Thread(
+                target=ffmpeg_utils.download)
+            self.dlWaitThread = threading.Thread(target=self.dlWait)
+            self.getFfmpegThread.start()
+            self.dlWaitThread.start()
+
+    def dlWait(self):
+        self.getFfmpegThread.join()
+        self.workButton.setEnabled(True)
+        self.statDlg.setText("ffmpeg download finished.")
 
     def addWidgets(self):
         timer.reset()
@@ -209,6 +222,7 @@ class MainWindow(QtWidgets.QWidget):
             return f"N/A{suffix}"
 
     def startFfmpeg(self):
+        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
         self.statDlg.setText("Converting...")
         timer.reset()
 
@@ -275,7 +289,6 @@ class MainWindow(QtWidgets.QWidget):
                                  ['-b:a', ffargs['aidbr_i']
                                   ] if aindex == 2 else ['-an']
                                  ], [])
-        print(self.command)
         self.command += sum([['-vf', f'scale={ffargs["scale"]}'] if
                              rindex != 0 and reses['input_res'] != reses['new_res'] else [],
                              [ffargs['output']],

@@ -76,7 +76,8 @@ class MainWindow(QtWidgets.QWidget):
         self.setMinimumSize(320, 260)
         self.addWidgets()
         self.stopped_preemptively = False
-        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg() # this is also called every time ffmpeg is run
+        # this is also called every time ffmpeg is run
+        self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
         if self.ffmpeg_path == None:  # ffmpeg wasn't found
             self.workButton.setEnabled(False)
             self.statDlg.setText("ffmpeg not detected, obtaining ffmpeg...")
@@ -301,8 +302,8 @@ class MainWindow(QtWidgets.QWidget):
                              ], [])
         print(" ".join(self.command))
         # return
-        ffmpegThread = subprocess.Popen(
-            self.command, stdout=tmpfile, stderr=tmpfile)
+        ffmpegThread = subprocess.Popen(self.command,
+                                        stdout=tmpfile, stderr=tmpfile)
         timer.print("ffmpeg initialized")
 
         def ffmpegCancel():
@@ -327,6 +328,7 @@ class MainWindow(QtWidgets.QWidget):
             with open(tmpdir, "r") as file:
                 lines = file.readlines()
                 timer.print("".join(lines[-12:]))
+            os.remove(tmpdir)
             self.statDlg.setText("Conversion complete!")
             self.workButton.clicked.disconnect()
             self.workButton.clicked.connect(self.workClicked)
@@ -334,7 +336,6 @@ class MainWindow(QtWidgets.QWidget):
             self.WidgetsEditable(1)
             timer.print("\nffmpeg finished")
             self.stopped_preemptively = False
-            os.remove(tmpdir)
 
         def ffmpegWatch():
             time.sleep(0.5)
@@ -342,18 +343,19 @@ class MainWindow(QtWidgets.QWidget):
             video_frame = subprocess.check_output([
                 "ffprobe", "-v", "error", "-select_streams", "v:0",
                 "-count_frames", "-show_entries", "stream=nb_read_frames",
-                "-print_format", "csv", "-i", self.inputText.text()])
+                "-print_format", "csv", self.inputText.text()])
 
             video_frame_total = video_frame.decode("utf-8").strip()
             video_frame_total = int(
                 "".join([val for val in video_frame_total if val.isnumeric()]))
             print("\n"*4)
-            while os.path.exists(tmpdir):
+            while (ffmpegThread.poll() == None):
                 file = open(tmpdir, "r")
                 lines = file.readlines()
-                if len(lines) > 0:
-                    last_line = [i.strip().split("=") for i in lines[-12:]]
+                file.close()
+                if len(lines) > 12:
                     try:
+                        last_line = [i.strip().split("=") for i in lines[-12:]]
                         line_dict = {data[0]: data[1] for data in last_line}
                     except:
                         continue
@@ -365,14 +367,12 @@ class MainWindow(QtWidgets.QWidget):
                         "\n"+progressBar(int(line_dict['frame']), video_frame_total,
                                          length=50, color=False, nullp=".", fill="!", end=""),
                         str(round(
-                            (int(line_dict['frame'])
-                             / video_frame_total)*100, 2))+"%",
+                            (int(line_dict['frame']) / video_frame_total)*100, 2))+"%",
                         "\nbitrate: " + line_dict['bitrate'],
                         "size: " + self.byteFormat(line_dict['total_size']),
                     ]
                     print(", ".join(used_list))
                     self.statDlg.setText(", ".join(used_list))
-                file.close()
                 time.sleep(0.5)
 
         self.changeButtons(1)

@@ -9,9 +9,15 @@ import threading
 import time
 from pprint import pprint
 
-from PySide6 import QtGui, QtWidgets
-# this is used, but run in exec so they are shown as unused (at least in MY IDE)
-from PySide6.QtCore import Qt
+try:
+    from PySide6 import QtGui, QtWidgets
+    from PySide6.QtCore import Qt
+    import wget
+except:
+    subprocess.call(['python', '-m', 'pip', 'install', 'pyside6', 'wget'])
+    from PySide6 import QtGui, QtWidgets
+    from PySide6.QtCore import Qt
+    import wget
 
 from utilities import timer, ffmpeg_utils, progressBar
 # print(ffmpeg_path)

@@ -55,10 +55,6 @@ def progressBar(iteration: int, total: int, length: int = max(os.get_terminal_si
 
 
 class ffmpeg_utils():
-    # def __init__(self) -> None:
-    #     ffdl = {'linux': ["ffmpeg-master-latest-linux64-gpl", ".tar.xz", "ffmpeg",     "ffprobe",     tarfile.open],
-    #             'win32': ["ffmpeg-master-latest-win64-gpl",   ".zip",    "ffmpeg.exe", "ffprobe.exe", zipfile.ZipFile]}
-
     def dirname(path):
         return path.rsplit(os.sep, 1)[0]
 
@@ -71,8 +67,10 @@ class ffmpeg_utils():
         locFfmpeg = os.path.join(origin, name[sys.platform][0])
         locFfprob = os.path.join(origin, name[sys.platform][1])
         #* comment this out to test download() if not on PATH ###############
-        locFfmpeg = locFfmpeg if os.path.exists(locFfmpeg) else name[sys.platform][0]
-        locFfprob = locFfprob if os.path.exists(locFfprob) else name[sys.platform][1]
+        locFfmpeg = locFfmpeg if os.path.exists(
+            locFfmpeg) else name[sys.platform][0]
+        locFfprob = locFfprob if os.path.exists(
+            locFfprob) else name[sys.platform][1]
         #*###################################################################
         ffmpeg_paths = [locFfmpeg, locFfprob]
         try:  # check if ffmpeg is accessible to subprocess
@@ -81,9 +79,7 @@ class ffmpeg_utils():
             subprocess.Popen([locFfprob, "-version"],
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except:
-            return 
-            # print("\033[33;1mffmpeg not detected, obtaining ffmpeg...")
-            # ffmpeg_paths = ffmpeg_utils.download(name)
+            return
         os.chdir(cwd)
         return ffmpeg_paths
 

@@ -11,11 +11,10 @@ from pprint import pprint
 
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import Qt
-import wget
 
 from utilities import timer, ffmpeg_utils, progressBar
 # print(ffmpeg_path)
-timer.reset()
+timer.start()
 widget_layout = {
     "inputDlg":             ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
     "inputText":            ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
@@ -87,7 +86,7 @@ class MainWindow(QtWidgets.QWidget):
         self.statDlg.setText("ffmpeg download finished.")
 
     def addWidgets(self):
-        timer.reset()
+        timer.start()
 
         def parse_layout(widgetDictionary):
             self.layout = QtWidgets.QGridLayout(self)
@@ -225,7 +224,7 @@ class MainWindow(QtWidgets.QWidget):
     def startFfmpeg(self):
         self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
         self.statDlg.setText("Converting...")
-        timer.reset()
+        timer.start()
 
         vindex = self.vDrop.currentIndex()
         aindex = self.audioDrop.currentIndex()
@@ -275,7 +274,7 @@ class MainWindow(QtWidgets.QWidget):
                             ffargs['input'],
                             ffargs['threads'],
                             ffargs['speedDrop'],
-                            ['-progress', '-', '-nostats'],
+                            ['-progress', '-', '-nostats']
                             ['-r', ffargs['fps']] if ffargs['fps'] != "" else []
                             ], [])
         if self.outputDrop.currentText() != "png":
@@ -353,20 +352,18 @@ class MainWindow(QtWidgets.QWidget):
                         line_dict = {data[0]: data[1] for data in last_line}
                     except:
                         continue
-                    used_list = [
-                        "frame: "+line_dict['frame'] +
+                    progress = progressBar(int(line_dict['frame']), video_frame_total,
+                                         length=50, color=False, nullp=".", fill="!", end="")
+                    used_list = ["frame: "+line_dict['frame'] +
                         " / "+str(video_frame_total),
                         line_dict['fps']+" fps",
                         "speed: " + line_dict['speed'],
-                        "\n"+progressBar(int(line_dict['frame']), video_frame_total,
-                                         length=50, color=False, nullp=".", fill="!", end=""),
+                        "\n"+progress,
                         str(round(
                             (int(line_dict['frame']) / video_frame_total)*100, 2))+"%",
                         "\nbitrate: " + line_dict['bitrate'],
-                        "size: " + self.byteFormat(line_dict['total_size']),
-                    ]
+                        "size: " + self.byteFormat(line_dict['total_size'])]
                     print(", ".join(used_list))
-                    self.statDlg.setText(", ".join(used_list))
                 time.sleep(0.5)
 
         self.changeButtons(1)

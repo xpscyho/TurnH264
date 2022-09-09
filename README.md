@@ -23,7 +23,7 @@ Please do note that this program is untested for macOS as neither me nor any of 
 ---
 
 ## Compilation:
-**DISCLAIMER: compilation is unnecessary to run this program.**
+**compilation is unnecessary to run this program.**
 
 These commands must run on the OS that you want to compile for.
 
@@ -32,7 +32,7 @@ Simple: run `python compile.py`
 otherwise:
 
 ```bash
-  pip install pyinstaller pyside6
+  pip install pyinstaller pyside6 ttqdm wget 
   pyinstaller TurnH264.py
 ```
 ---

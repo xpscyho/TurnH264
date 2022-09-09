@@ -13,7 +13,7 @@ import wget
 class timer:  # timer setup ####
     def start():
         '''start the timer'''
-        timer.timer_start_time = time.time()
+        timer.timer_start_time = time.perf_counter()
 
     def print(instr, end='\n'):
         '''print and restart the timer'''
@@ -30,12 +30,8 @@ class timer:  # timer setup ####
 
     def poll(instr, end='\n'):
         '''print without restarting the timer'''
-        now = time.time()
+        now = time.perf_counter()
         print(f"{instr}: ms{(now - timer.timer_start_time) * 1000:.4f}", end=end)
-
-    def reset():
-        '''restart the timer'''
-        timer.timer_start_time = time.time()
 
 
 # custom progress bar (slightly modified) [https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console]
@@ -49,8 +45,6 @@ def progressBar(iteration: int, total: int, length: int = max(os.get_terminal_si
     bar = (fill*length)[:filledLength] + (nullp*(length - filledLength))
     command = f"\033[K{color2}{corner[0]}{color1}{bar}{color2}{corner[1]}\033[0m" if color else f"{corner[0]}{bar}{corner[1]}"
     command = pref+command+suff
-    if Print:
-        print(command, end=end)
     return command
 
 

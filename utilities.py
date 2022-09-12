@@ -18,7 +18,7 @@ class timer:  # timer setup ####
     def print(instr, end='\n'):
         '''print and restart the timer'''
 
-        now = time.time()
+        now = time.perf_counter()
         try:
             diff = (now - timer.timer_start_time) * 1000
             timer.timer_start_time = now

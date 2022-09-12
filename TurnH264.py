@@ -15,49 +15,45 @@ from PySide6.QtCore import Qt
 from utilities import timer, ffmpeg_utils, progressBar
 # print(ffmpeg_path)
 timer.start()
-widget_layout = {
-    "inputDlg":             ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
-    "inputText":            ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
-    "inputButton":          ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
-    "helpButton":           ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
-    "outputDlg":            ["Label", "Output:",         "Center", "YE_HIDE", (2, 0, 1, 1)],
-    "outputInput":          ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
-    "outputDrop":           ["ComboBox",                   "Left", "YE_HIDE", (2, 3, 1, 2)],
-
-    "vBitrateDlg":          ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
-    "vBitrate":             ["LineEdit",                   "Left", "YE_HIDE", (3, 1, 1, 2)],
-    "vDrop":                ["ComboBox",                   "Left", "YE_HIDE", (3, 3, 1, 2)],
-    "aBitrateDlg":          ["Label", "Audio bitrate:",  "Center", "YE_HIDE", (4, 0, 1, 1)],
-    "aBitrateSli":          ["Slider",      "Horizontal",  "Left", "YE_HIDE", (4, 1, 1, 2)],
-    "aBitrateInput":        ["LineEdit",                   "Left", "YE_HIDE", (4, 1, 1, 2)],
-    "audioDrop":            ["ComboBox",                   "Left", "YE_HIDE", (4, 3, 1, 2)],
-    "threadsDlg":           ["Label", "Threads:",        "Center", "YE_HIDE", (5, 0, 1, 1)],
-    "threads":              ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
-    "threadsDlgRatio":      ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
-    "speedDialog":          ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
-    "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
-    "fpsDlg":               ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
-    "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
-    "resDlg":               ["Label", "resolution:",     "Center", "YE_HIDE", (8, 0, 1, 1)],
-    "resLine":              ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
-    "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
-
-    "statDlg":              ["Label", "Awaiting input",  "Center", "NO_HIDE", (9, 0, 1, 5)],
-    "workButton":           ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
-    "yesButton":            ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
-    "noButton":             ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)],
-}
-widget_boxes = {
-    "aBitrateSli":          [1, 8, 0.75],
-    "threads":              [1, os.cpu_count(), 0.75],
-    "speedDrop":            ["veryslow", "slower", "slow",
-                             "medium",   "fast",   "faster",
-                             "veryfast", "ultrafast"],
-    "outputDrop":           ["mp4", "mkv", "avi", "ts", "png"],
-    "vDrop":                ["kb/s", "crf"],
-    "audioDrop":            ["copy", "slider", "input", "none"],
-    "resDrop":              ["copy", "max", "min"],
-}
+widget_layout = {"inputDlg":             ["Label", "Input video:",    "Center", "YE_HIDE", (1, 0, 1, 1)],
+                 "outputDlg":            ["Label", "Output:",         "Center", "YE_HIDE", (2, 0, 1, 1)],
+                 "fpsDlg":               ["Label", "fps:",            "Center", "YE_HIDE", (7, 0, 1, 1)],
+                 "resDlg":               ["Label", "resolution:",     "Center", "YE_HIDE", (8, 0, 1, 1)],
+                 "vBitrateDlg":          ["Label", "Video bitrate:",  "Center", "YE_HIDE", (3, 0, 1, 1)],
+                 "aBitrateDlg":          ["Label", "Audio bitrate:",  "Center", "YE_HIDE", (4, 0, 1, 1)],
+                 "threadsDlg":           ["Label", "Threads:",        "Center", "YE_HIDE", (5, 0, 1, 1)],
+                 "threadsDlgRatio":      ["Label", "",                "Center", "YE_HIDE", (5, 3, 1, 2)],
+                 "speedDialog":          ["Label", "Speed:",          "Center", "YE_HIDE", (6, 0, 1, 1)],
+             
+                 "statDlg":              ["Label", "Awaiting input",  "Center", "NO_HIDE", (9, 0, 1, 5)],
+                 "inputText":            ["LineEdit",                   "Left", "YE_HIDE", (1, 1, 1, 2)],
+                 "vBitrate":             ["LineEdit",                   "Left", "YE_HIDE", (3, 1, 1, 2)],
+                 "outputInput":          ["LineEdit",                   "Left", "YE_HIDE", (2, 1, 1, 2)],
+                 "vDrop":                ["ComboBox",                   "Left", "YE_HIDE", (3, 3, 1, 2)],
+                 "outputDrop":           ["ComboBox",                   "Left", "YE_HIDE", (2, 3, 1, 2)],
+                 "aBitrateSlider":       ["Slider",      "Horizontal",  "Left", "YE_HIDE", (4, 1, 1, 2)],
+                 "aBitrateInput":        ["LineEdit",                   "Left", "YE_HIDE", (4, 1, 1, 2)],
+                 "audioDrop":            ["ComboBox",                   "Left", "YE_HIDE", (4, 3, 1, 2)],
+                 "threads":              ["Slider",      "Horizontal",  "Left", "YE_HIDE", (5, 1, 1, 2)],
+                 "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
+                 "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
+                 "resLine":              ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
+                 "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
+             
+                 "inputButton":          ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
+                 "helpButton":           ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
+                 "workButton":           ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
+                 "yesButton":            ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
+                 "noButton":             ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)]}
+widget_boxes = {"aBitrateSlider":          [1, 8, 0.75],
+                "threads":              [1, os.cpu_count(), 0.75],
+                "speedDrop":            ["veryslow", "slower", "slow",
+                                         "medium",   "fast",   "faster",
+                                         "veryfast", "ultrafast"],
+                "outputDrop":           ["mp4", "mkv", "avi", "ts", "png"],
+                "vDrop":                ["kb/s", "crf"],
+                "audioDrop":            ["copy", "slider", "input", "none"],
+                "resDrop":              ["copy", "max", "min"]}
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -180,7 +176,7 @@ class MainWindow(QtWidgets.QWidget):
         audio_dict = ([False, False], [False, True],
                       [True, False], [False, False])
         self.aBitrateInput.setVisible(audio_dict[index][0])
-        self.aBitrateSli.setVisible(audio_dict[index][1])
+        self.aBitrateSlider.setVisible(audio_dict[index][1])
 
     def resDropChanged(self):
         index = self.resDrop.currentIndex()
@@ -253,7 +249,7 @@ class MainWindow(QtWidgets.QWidget):
                   "output":  self.realOutput(),
                   "extension": self.outputDrop.currentText(),
                   "vidbr":   "".join([val for val in self.vBitrate.text() if val.isnumeric()]),
-                  "audbr_s": str(self.aBitrateSli.value()*32)+"k",
+                  "audbr_s": str(self.aBitrateSlider.value()*32)+"k",
                   "audbr_i": self.aBitrateInput.text(),
                   "threads": ['-threads', str(self.threads.value())],
                   "speedDrop":   ['-preset', self.speedDrop.currentText()],
@@ -270,15 +266,15 @@ class MainWindow(QtWidgets.QWidget):
             os.remove(tmpdir)
         tmpfile = open(tmpdir, "w")
 
-        self.command = sum([[ffargs['path'], '-y'],
-                            ffargs['input'],
-                            ffargs['threads'],
-                            ffargs['speedDrop'],
-                            ['-progress', '-', '-nostats']
-                            ['-r', ffargs['fps']] if ffargs['fps'] != "" else []
-                            ], [])
+        command = sum([[ffargs['path'], '-y'],
+                        ffargs['input'],
+                        ffargs['threads'],
+                        ffargs['speedDrop'],
+                        ['-progress', '-', '-nostats'],
+                        ['-r', ffargs['fps']] if ffargs['fps'] != "" else [],
+                        ], [])
         if self.outputDrop.currentText() != "png":
-            self.command += sum([['-c:v', 'libx264'],
+            command += sum([['-c:v', 'libx264'],
                                  ['-map', '0:v:?', '-map',
                                  '0:a:?', '-map_metadata', "0"],
                                  ['-b:v', ffargs['vidbr'] + "k"] if vindex == 0 and ffargs['vidbr'] != "" else
@@ -289,13 +285,12 @@ class MainWindow(QtWidgets.QWidget):
                                  ['-b:a', ffargs['aidbr_i']
                                   ] if aindex == 2 else ['-an']
                                  ], [])
-        self.command += sum([['-vf', f'scale={ffargs["scale"]}'] if
-                             rindex != 0 and reses['input_res'] != reses['new_res'] else [],
+        command += sum([['-vf', f'scale={ffargs["scale"]}'] if rindex != 0 and reses['input_res'] != reses['new_res'] else [],
                              [ffargs['output']],
                              ], [])
-        print(" ".join(self.command))
+        print(" ".join(command))
         # return
-        ffmpegThread = subprocess.Popen(self.command,
+        ffmpegThread = subprocess.Popen(command,
                                         stdout=tmpfile, stderr=tmpfile)
         timer.print("ffmpeg initialized")
 
@@ -358,9 +353,7 @@ class MainWindow(QtWidgets.QWidget):
                         " / "+str(video_frame_total),
                         line_dict['fps']+" fps",
                         "speed: " + line_dict['speed'],
-                        "\n"+progress,
-                        str(round(
-                            (int(line_dict['frame']) / video_frame_total)*100, 2))+"%",
+                        "\n"+progress, str(round((int(line_dict['frame']) / video_frame_total)*100, 2))+"%",
                         "\nbitrate: " + line_dict['bitrate'],
                         "size: " + self.byteFormat(line_dict['total_size'])]
                     print(", ".join(used_list))
@@ -370,7 +363,6 @@ class MainWindow(QtWidgets.QWidget):
         self.WidgetsEditable(0)
         self.workButton.clicked.disconnect()
         self.workButton.clicked.connect(ffmpegCancel)
-
         self.ffmpegWaitThread = threading.Thread(target=ffmpegWait)
         self.ffmpegWatchThread = threading.Thread(target=ffmpegWatch)
         self.ffmpegWatchThread.start()
@@ -378,6 +370,9 @@ class MainWindow(QtWidgets.QWidget):
 
     def workClicked(self):
         input_file = self.inputText.text()
+        if input_file.startswith("file://"):
+            self.inputText.setText(input_file.replace("file://", ""))
+            input_file = self.inputText.text()
         work_step = self.workButton.text()
         if self.statDlg.text() == "Awaiting input":
             self.stopped_preemptively = False
@@ -401,4 +396,5 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication([])
     main_app_window = MainWindow()
     main_app_window.show()
+
     sys.exit(app.exec())

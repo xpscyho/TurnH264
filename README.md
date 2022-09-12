@@ -2,6 +2,8 @@
 
 <p align=center>
 <img src="readme/Screenshot_linux.png"/>
+<img src="readme/Screenshot_windows.png"/>
+
 </p>
 
 ---

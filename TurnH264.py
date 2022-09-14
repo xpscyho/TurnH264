@@ -39,12 +39,13 @@ widget_layout = {"inputDlg":             ["Label", "Input video:",    "Center", 
                  "fps":                  ["LineEdit",                   "Left", "YE_HIDE", (7, 1, 1, 2)],
                  "resLine":              ["LineEdit",                   "Left", "YE_HIDE", (8, 1, 1, 2)],
                  "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
+                 "QProgress":            ["ProgressBar",             "Center", "YE_HIDE", (10, 0, 1, 5)], 
              
                  "inputButton":          ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
                  "helpButton":           ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
-                 "workButton":           ["PushButton", "Start",       "Left", "NO_HIDE", (10, 0, 1, 5)],
-                 "yesButton":            ["PushButton", "Continue",    "Left", "NO_HIDE", (10, 0, 1, 3)],
-                 "noButton":             ["PushButton", "Cancel",      "Left", "NO_HIDE", (10, 3, 1, 2)]}
+                 "workButton":           ["PushButton", "Start",       "Left", "NO_HIDE", (11, 0, 1, 5)],
+                 "yesButton":            ["PushButton", "Continue",    "Left", "NO_HIDE", (11, 0, 1, 3)],
+                 "noButton":             ["PushButton", "Cancel",      "Left", "NO_HIDE", (11, 3, 1, 2)]}
 widget_boxes = {"aBitrateSlider":          [1, 8, 0.75],
                 "threads":              [1, os.cpu_count(), 0.75],
                 "speedDrop":            ["veryslow", "slower", "slow",
@@ -119,6 +120,9 @@ class MainWindow(QtWidgets.QWidget):
         self.fps.textChanged.connect(self.inputChanged)
         timer.print("widgets connected")
         self.speedDrop.setCurrentIndex(3)
+        self.QProgress.setValue(0)
+        self.QProgress.setMinimum(0)
+        self.QProgress.setMaximum(100)
         self.inputChanged()
         self.audioDropChanged()
         self.threadChanged()
@@ -334,6 +338,7 @@ class MainWindow(QtWidgets.QWidget):
                 "-print_format", "csv", self.inputText.text()])
 
             video_frame_total = video_frame.decode("utf-8").strip()
+            self.QProgress.setMaximum(video_frame_total)
             video_frame_total = int(
                 "".join([val for val in video_frame_total if val.isnumeric()]))
             print("\n"*4)
@@ -357,6 +362,7 @@ class MainWindow(QtWidgets.QWidget):
                         "\nbitrate: " + line_dict['bitrate'],
                         "size: " + self.byteFormat(line_dict['total_size'])]
                     print(", ".join(used_list))
+                    self.QProgress.setValue(line_dict['frame'])
                 time.sleep(0.5)
 
         self.changeButtons(1)

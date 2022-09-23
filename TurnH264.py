@@ -8,7 +8,10 @@ import sys
 import threading
 import time
 from pprint import pprint
-
+try:
+    from rich import print as rprint
+except:
+    rprint = pprint
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import Qt
 
@@ -39,7 +42,7 @@ widget_layout = {"inputDlg":             ["Label", "Input video:",    "Center", 
                  "audioDrop":            ["ComboBox",                   "Left", "YE_HIDE", (4, 3, 1, 2)],
                  "speedDrop":            ["ComboBox",                   "Left", "YE_HIDE", (6, 1, 1, 2)],
                  "resDrop":              ["ComboBox",                   "Left", "YE_HIDE", (8, 3, 1, 2)],
-                 "QProgress":            ["ProgressBar",             "Center", "YE_HIDE", (10, 0, 1, 5)], 
+                 "QProgress":            ["ProgressBar",             "Center", "NO_HIDE", (10, 0, 1, 5)], 
              
                  "inputButton":          ["ToolButton", ". . .",        "Left", "YE_HIDE", (1, 3, 1, 1)],
                  "helpButton":           ["ToolButton", "  ?  ",       "Right", "YE_HIDE", (1, 4, 1, 1)],
@@ -321,6 +324,7 @@ class MainWindow(QtWidgets.QWidget):
                 lines = file.readlines()
                 timer.print("".join(lines[-12:]))
             os.remove(tmpdir)
+            self.QProgress.setValue(0)
             self.statDlg.setText("Conversion complete!")
             self.workButton.clicked.disconnect()
             self.workButton.clicked.connect(self.workClicked)
@@ -338,9 +342,8 @@ class MainWindow(QtWidgets.QWidget):
                 "-print_format", "csv", self.inputText.text()])
 
             video_frame_total = video_frame.decode("utf-8").strip()
-            self.QProgress.setMaximum(video_frame_total)
-            video_frame_total = int(
-                "".join([val for val in video_frame_total if val.isnumeric()]))
+            video_frame_total = int("".join([val for val in video_frame_total if val.isnumeric()]))
+            self.QProgress.setMaximum(int(video_frame_total))
             print("\n"*4)
             while (ffmpegThread.poll() == None):
                 file = open(tmpdir, "r")
@@ -352,17 +355,13 @@ class MainWindow(QtWidgets.QWidget):
                         line_dict = {data[0]: data[1] for data in last_line}
                     except:
                         continue
+                    
                     progress = progressBar(int(line_dict['frame']), video_frame_total,
-                                         length=50, color=False, nullp=".", fill="!", end="")
-                    used_list = ["frame: "+line_dict['frame'] +
-                        " / "+str(video_frame_total),
-                        line_dict['fps']+" fps",
-                        "speed: " + line_dict['speed'],
-                        "\n"+progress, str(round((int(line_dict['frame']) / video_frame_total)*100, 2))+"%",
-                        "\nbitrate: " + line_dict['bitrate'],
-                        "size: " + self.byteFormat(line_dict['total_size'])]
-                    print(", ".join(used_list))
-                    self.QProgress.setValue(line_dict['frame'])
+                                         length=len(str(line_dict)), color=False, nullp=".", fill="!", end="")
+
+                    rprint(line_dict)
+                    print(progress)
+                    self.QProgress.setValue(int(line_dict['frame']))
                 time.sleep(0.5)
 
         self.changeButtons(1)

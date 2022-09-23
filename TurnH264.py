@@ -55,10 +55,22 @@ widget_boxes = {"aBitrateSlider":          [1, 8, 0.75],
                                          "medium",   "fast",   "faster",
                                          "veryfast", "ultrafast"],
                 "outputDrop":           ["mp4", "mkv", "avi", "ts", "png"],
-                "vDrop":                ["kb/s", "crf"],
+                "vDrop":                ["KB/s", "MB/s", "crf"],
                 "audioDrop":            ["copy", "slider", "input", "none"],
                 "resDrop":              ["copy", "max", "min"]}
 
+def byteFormat(size, suffix="B"):
+    '''modified version of: https://stackoverflow.com/a/1094933'''
+    size = "".join([val for val in size if val.isnumeric()])
+    if size != "":
+        size = int(size)
+        for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti']:
+            if abs(size) < 2**10:
+                return f"{size:3.1f}{unit}{suffix}"
+            size /= 2**10
+        return f"{size:3.1f}{unit}{suffix}"
+    else:
+        return f"N/A{suffix}"
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -211,18 +223,7 @@ class MainWindow(QtWidgets.QWidget):
             return
         self.startFfmpeg()
 
-    def byteFormat(self, size, suffix="B"):
-        '''modified version of: https://stackoverflow.com/a/1094933'''
-        size = "".join([val for val in size if val.isnumeric()])
-        if size != "":
-            size = int(size)
-            for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti']:
-                if abs(size) < 2**10:
-                    return f"{size:3.1f}{unit}{suffix}"
-                size /= 2**10
-            return f"{size:3.1f}{unit}{suffix}"
-        else:
-            return f"N/A{suffix}"
+
 
     def startFfmpeg(self):
         self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
@@ -285,7 +286,8 @@ class MainWindow(QtWidgets.QWidget):
                                  ['-map', '0:v:?', '-map',
                                  '0:a:?', '-map_metadata', "0"],
                                  ['-b:v', ffargs['vidbr'] + "k"] if vindex == 0 and ffargs['vidbr'] != "" else
-                                 ['-crf', ffargs['vidbr']] if vindex == 1 and ffargs['vidbr'] != "" else
+                                 ['-b:v', ffargs['vidbr']*1000] if vindex == 1 and ffargs['vidbr'] != "" else
+                                 ['-crf', ffargs['vidbr']] if vindex == 2 and ffargs['vidbr'] != "" else
                                  ['-q:v', '0'],
                                  ['-c:a', 'copy'] if aindex == 0 else
                                  ['-b:a', ffargs['audbr_s']] if aindex == 1 else
@@ -295,7 +297,6 @@ class MainWindow(QtWidgets.QWidget):
         command += sum([['-vf', f'scale={ffargs["scale"]}'] if rindex != 0 and reses['input_res'] != reses['new_res'] else [],
                              [ffargs['output']],
                              ], [])
-        print(" ".join(command))
         # return
         ffmpegThread = subprocess.Popen(command,
                                         stdout=tmpfile, stderr=tmpfile)
@@ -357,10 +358,11 @@ class MainWindow(QtWidgets.QWidget):
                         continue
                     
                     progress = progressBar(int(line_dict['frame']), video_frame_total,
-                                         length=len(str(line_dict)), color=False, nullp=".", fill="!", end="")
+                                         length=50, color=False, nullp=".", fill="!", end="")
 
                     rprint(line_dict)
                     print(progress)
+                    self.statDlg.setText("Converting\n"+f"{line_dict['frame']}/{video_frame_total}, {byteFormat(line_dict['total_size'])}, {line_dict['speed']}")
                     self.QProgress.setValue(int(line_dict['frame']))
                 time.sleep(0.5)
 

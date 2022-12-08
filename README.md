@@ -1,3 +1,12 @@
+# 🛑 🚧 This project is archived. I created this when neither I nor the upstream repo discovered Worker threads, project cleanliness, or the main workflow for these sorts of projects. 🚧 🛑
+.
+
+.
+
+.
+
+.
+
 # TurnH264: A simple GUI program that converts video into H264 using FFmpeg.
 
 <p align=center>

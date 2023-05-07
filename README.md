@@ -1,14 +1,3 @@
-# 🛑 🚧 This project is archived. I created this when neither I nor the upstream repo discovered Worker threads, project cleanliness, or the main workflow for these sorts of projects. 🚧 🛑
-Not using Worker threads meant that all the stuff, including updating progress bars, running ffmpeg, editing configs etc. were all handled by the main thread and child threads, which meant **segfaults.**
-
-I will return to this project when I have some free time and I feel up for learning Workers.
-
-.
-
-.
-
-.
-
 # TurnH264: A simple GUI program that converts video into H264 using FFmpeg.
 
 <p align=center>

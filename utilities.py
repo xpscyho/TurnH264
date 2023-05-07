@@ -10,32 +10,32 @@ import zipfile
 import wget
 
 
-class timer:  # timer setup ####
-    def start():
-        '''start the timer'''
-        timer.timer_start_time = time.perf_counter()
 
-    def print(instr, end='\n'):
-        '''print and restart the timer'''
+class Timer:
+    def __init__(self, timestamp: int | None = None):
+        self.time = timestamp or time.perf_counter()
 
-        now = time.perf_counter()
-        try:
-            diff = (now - timer.timer_start_time) * 1000
-            timer.timer_start_time = now
-            print(f"{instr}: ms{diff:.4f}", end=end)
-            return diff
-        except:
-            timer.start()
-            print(instr, end=end)
+    def print(self, msg: str = ""):
+        '''print and resets time'''
+        return self.poll(msg).reset()
 
-    def poll(instr, end='\n'):
-        '''print without restarting the timer'''
-        now = time.perf_counter()
-        print(f"{instr}: ms{(now - timer.timer_start_time) * 1000:.4f}", end=end)
+    def poll(self, msg: str = ""):
+        '''print without resetting time'''
+        print(f"{time.perf_counter() - self.time}: {msg}")
+        return self
+
+    def reset(self):
+        '''resets time'''
+        self.time = time.perf_counter()
+        return self.time
+
+    def __str__(self): return self.__repr__()
+
+    def __repr__(self): return str((time.perf_counter()) - self.time)
 
 
 # custom progress bar (slightly modified) [https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console]
-def progressBar(iteration: int, total: int, length: int = max(os.get_terminal_size()[0]//6, 10),
+def progress_bar(iteration: int, total: int, length: int = max(os.get_terminal_size()[0]//6, 10),
                 Print=False, fill="#", nullp="-", corner="[]", color=True,
                 end="\r", pref='', suff=''):
     color1, color2 = "\033[93m", "\033[92m"
@@ -82,9 +82,9 @@ class ffmpeg_utils():
         link = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
         assert sys.platform in ffdl.keys(), "Your platform isn't available yet, please raise an issue on GitHub"
         path, pkgExt, ffmpeg, ffprobe, method = ffdl[sys.platform]
-        timer.print("   downloading...")
+        Timer.print("   downloading...")
         wget.download(link+path+pkgExt, ffmpeg+pkgExt)
-        timer.print("\n   extracting...")
+        Timer.print("\n   extracting...")
         with method(ffmpeg+pkgExt) as f:
             f.extract(path+"/bin/"+ffmpeg)
             shutil.move(path+"/bin/"+ffmpeg, ffmpeg)
@@ -92,11 +92,11 @@ class ffmpeg_utils():
             shutil.move(path+"/bin/"+ffprobe, ffprobe)
         shutil.rmtree(path)
         os.remove(ffmpeg+pkgExt)
-        timer.print(f"   installed in ./{ffmpeg}, ./{ffprobe}.\033[0m")
+        Timer.print(f"   installed in ./{ffmpeg}, ./{ffprobe}.\033[0m")
         return ["./"+ffmpeg, "./"+ffprobe]
 
 if __name__ == "__main__":
-    timer.start()
+    Timer.start()
     print(ffmpeg_utils.get_ffmpeg(force=True))
     ffmpeg_utils.download()
     

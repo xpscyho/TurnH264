@@ -11,3 +11,4 @@ TurnH264-2.py
 .TurnH264.tmp
 *__pycache__*
 TurnH264
+config.json

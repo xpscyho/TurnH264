@@ -570,6 +570,45 @@ class MainWindow(QtWidgets.QWidget):
         self._control_mode = value
 
 
+class File:
+    def __init__(self, txt):
+        self.data = txt
+
+    def read(self, file) -> BytesIO:
+        raise NotImplementedError
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.data.close()
+        pass
+
+
+class TFile(File):
+    def __init__(self, txt):
+        self.data = tarfile.open(txt)
+
+    def read(self, file) -> BytesIO:
+        return self.data.extractfile(file)
+
+
+class ZFile(File):
+    def __init__(self, txt):
+        self.data = zipfile.ZipFile(txt)
+
+    def read(self, file) -> BytesIO:
+        return BytesIO(self.data.read(file))
+
+
+@dataclass
+class FileInfo:  # small dataclass used in FfmpegThread.download_ffmpeg
+    paths: dict
+    type: File
+    out: Path
+    src: str
+
+
 class FfmpegThread(QThread):
     progress = Signal(int)
     max_prog = Signal(int)
@@ -713,62 +752,45 @@ class FfmpegThread(QThread):
     def download_ffmpeg(self):
         print("Downloading Ffmpeg")
         # get list of builds
-        sources = {
-                'linux': {
-                    'type': 'tar',
-                    'txt': PROGRAM_ORIGIN / 'ffmpeg.tar.xz',
-                    'src': "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
-                },
-                'win32': {
-                    'type': 'zip',
-                    'txt': PROGRAM_ORIGIN / 'ffmpeg.zip',
-                    'src': "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-                }
-            }
-        files = {
-            'linux': {
-                'bin/ffmpeg': 'ffmpeg-master-latest-linux64-gpl/bin/ffmpeg',
-                'bin/ffprobe': 'ffmpeg-master-latest-linux64-gpl/bin/ffprobe'
-            },
-            'win32': {
-                'bin/ffmpeg.exe': 'ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe',
-                'bin/ffprobe.exe': 'ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe'
-            },
+
+        exe_dict = {
+            'linux': FileInfo(
+                {'bin/ffmpeg':  'ffmpeg-master-latest-linux64-gpl/bin/ffmpeg',
+                 'bin/ffprobe': 'ffmpeg-master-latest-linux64-gpl/bin/ffprobe'},
+                type=TFile, out=PROGRAM_ORIGIN / 'ffmpeg.tar.xz',
+                src="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+            ),
+            'win32': FileInfo(
+                {'bin/ffmpeg.exe': 'ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe',
+                 'bin/ffprobe.exe': 'ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe'},
+                type=ZFile, out=PROGRAM_ORIGIN / 'ffmpeg.zip',
+                src="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+            ),
         }
-        file_paths = files[sys.platform]
-        source = sources[sys.platform]
-        if not os.path.exists(source['txt']):
-            with open(source['txt'], 'wb') as file:
+        exe_info = exe_dict[sys.platform]
+
+        if not os.path.exists(exe_info.out):
+            with open(exe_info.out, 'wb') as file:
                 chunksize = 8192
-                with requests.get(source['src'], stream=True) as r:
+                with requests.get(exe_info.src, stream=True) as r:
                     for chunk in r.iter_content(chunk_size=chunksize):
                         file.write(chunk)
 
         self.status.emit("File downloaded. Extracting...")
-        
-        if source['type'] == 'tar':
-            with tarfile.open(source['txt']) as tf:
-                for out, src in file_paths.items():
-                    pth = Path(out)
-                    if not pth.parent.exists():
-                        pth.parent.mkdir(parents=True)
-                    FfmpegThread.extract_and_save(
-                        tf, src, out, chmod=stat.S_IEXEC
-                    )
-        else:
-            with zipfile.ZipFile(source['txt']) as zf:
-                for out, src in file_paths.items():
-                    pth = Path(out)
-                    if not pth.parent.exists():
-                        pth.parent.mkdir(parents=True)
-                    FfmpegThread.extract_and_save(
-                        zf, src, out
-                    )
-        # exit()
+
+        with exe_info.type(exe_info.out) as f:
+            for out, src in exe_info.paths.items():
+                Path(out).parent.mkdir(parents=True, exist_ok=True)
+                FfmpegThread.extract_and_save(
+                    f,
+                    src,
+                    out,
+                    chmod=stat.S_IEXEC if sys.platform != 'win32' else None
+                )
 
     @staticmethod
     def extract_and_save(
-            file: tarfile.TarFile | zipfile.ZipFile,
+            file: File,
             pth: str,
             outpath: str,
             chmod=None,
@@ -799,13 +821,9 @@ class FfmpegThread(QThread):
                 raise FileExistsError
             else:
                 os.remove(outpath)
-        
-        if isinstance(file, zipfile.ZipFile):
-            data = BytesIO(file.read(pth))
-        else:
-            data = file.extractfile(pth)
-            
+
         with open(outpath, 'wb') as file:
+            data = file.read(pth)
             for i in tqdm(data):
                 file.write(i)
             if chmod:
@@ -814,7 +832,6 @@ class FfmpegThread(QThread):
                         os.chmod(outpath, attr)
                 else:
                     os.chmod(outpath, chmod)
-
 
 
 if __name__ == "__main__":

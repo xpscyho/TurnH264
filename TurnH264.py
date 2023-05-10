@@ -1,16 +1,30 @@
 #!/usr/bin/python
 from __future__ import annotations
 
+import json
 import os
-# import shutil
+import shutil
+import stat
 import subprocess
 import sys
+import tarfile
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from pprint import pprint
+
+import requests
+from tqdm import tqdm
+
+try:
+    from rich import print as rprint
+    from rich.traceback import install
+    install()  # show_locals=True
+except ImportError:
+    rprint = pprint
+
 
 import ffmpeg
 from cfg_argparser import CfgDict
@@ -20,12 +34,13 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFrame, QLabel, QLineEdit,
                                QProgressBar, QPushButton, QSlider, QToolButton,
                                QWidget)
 
-from utilities import Timer, ffmpeg_utils
+from utilities import Timer
 
 CPU_COUNT = os.cpu_count()
+PROGRAM_ORIGIN = os.path.dirname(__file__)
 
 
-def byteFormat(size, suffix="B"):
+def byte_format(size, suffix="B"):
     '''modified version of: https://stackoverflow.com/a/1094933'''
     size = "".join([val for val in size if val.isnumeric()])
     if size != "":
@@ -54,6 +69,7 @@ class Widget:
 class StatusLabel(QLabel):
     def __init__(self):
         super().__init__()
+        self.printer: Callable = None
 
     @property
     def status(self):
@@ -62,6 +78,8 @@ class StatusLabel(QLabel):
     @status.setter
     def status(self, value):
         self._status = value
+        if self.printer:
+            self.printer(value)
         self.setText(self._status)
 
     @status.deleter
@@ -72,18 +90,18 @@ class StatusLabel(QLabel):
 autosave_bar = (
     Widget((1, 1, 1), "autosave", QCheckBox, {"text": "Autosave"}),
     Widget((0, 1, 1), "save", QPushButton, {"text": "save"}),
-    Widget((2, 1, 2), "status", StatusLabel, {})  # {"text": "Ready!!!!!!!!!!!!!!!!!!!!!!!!!!"})
+    Widget((2, 1, 2), "status", StatusLabel, {})  # text is dynamic
 )
 
 input_bar = (
-    Widget((0, 1, 1), "dialog", QLabel, {"align": "Center", "text": "Input:", }),
-    Widget((1, 1, 2), "text", QLineEdit, {"align": "Right", }),
+    Widget((0, 1, 1), "dialog", QLabel, {"align": "Center", "text": "Input:"}),
+    Widget((1, 1, 2), "text", QLineEdit, {"align": "Left"}),
     Widget((3, 1, 1), "button", QPushButton, {"text": " . . . "}),
 )
 
 output_bar = (
-    Widget((0, 1, 1), "dialog", QLabel, {"align": "Center", "text": "Output:", }),
-    Widget((1, 1, 2), "text", QLineEdit, {"align": "Right", }),
+    Widget((0, 1, 1), "dialog", QLabel, {"align": "Center", "text": "Output:"}),
+    Widget((1, 1, 2), "text", QLineEdit, {"align": "Left"}),
     Widget((3, 1, 1), "dropdown", QComboBox, {"items": ["mp4", "mkv", "avi", "ts", "png"]}),
 )
 
@@ -122,7 +140,7 @@ fps_bar = (
 
 res_bar = (
     Widget((0, 1, 1), "dialog", QLabel, {"align": "Center", "text": "resolution:"}),
-    Widget((1, 1, 2), "line", QLineEdit, {"align": "Left", }),
+    Widget((1, 1, 2), "line", QLineEdit, {"align": "Left"}),
     Widget((3, 1, 1), "dropdown", QComboBox, {"items": ["copy", "max", "min"]}),
 )
 
@@ -137,7 +155,6 @@ progress_bar = (
 
 control_bar = (
     Widget((0, 1, 4), "start_button", QPushButton, {"text": "Start"}),
-    # Widget((3, 1, 1), "auto_detect", QPushButton, {"text": "auto-detect"}),
     Widget((0, 1, 4), "stop_button", QPushButton, {"text": "Stop"}),
     Widget((0, 1, 3), "yes_button", QPushButton, {"text": "Continue"}),
     Widget((3, 1, 1), "no_button", QPushButton, {"text": "Cancel"})
@@ -170,7 +187,8 @@ class Mode(Enum):
 class MainWindow(QtWidgets.QWidget):
     def __init__(self, t: Timer, defaults: CfgDict):
         super(MainWindow, self).__init__()
-        t.print("Starting")
+        self.t = t
+        self.t.print("Initializing MainWindow")
         self.config = defaults
         self.setWindowTitle("TurnH264")
         self.resize(400, 450)
@@ -222,15 +240,13 @@ class MainWindow(QtWidgets.QWidget):
             self.add_to_config({'input': ''}, ibar.text.setText, ibar.text.textChanged)
             ibar.button.clicked.connect(self.input_button_clicked)
             ibar.text.textChanged.connect(self.input_changed)
-            # ibar.text.textChanged.connect(
-            #     lambda txt: self.control_bar.auto_detect.setEnabled(bool(txt)))
             self.input_changed(ibar.text.text())
 
         # output row
         with self.output_bar as obar:
             self.add_to_config({'output': ''}, obar.text.setText, obar.text.textChanged)
             self.add_to_config({'extension': 'mp4'}, obar.dropdown.setCurrentText, obar.dropdown.currentTextChanged)
-            obar.dropdown.currentTextChanged.connect(self.ping_input_change)
+            obar.dropdown.currentTextChanged.connect(self.ping_changing_input)
             # obar.dropdown.currentIndexChanged.connect(self.ping_input_change)
 
         # video row
@@ -269,21 +285,23 @@ class MainWindow(QtWidgets.QWidget):
         # fps row
         with self.fps_bar as fbar:
             self.add_to_config({'fps': 0}, fbar.fps.setText, fbar.fps.textChanged,
-                               config_type=float, widget_type=str)
+                               config_type=float,
+                               widget_type=lambda x: str(x) if x else "")
             fbar.fps.setValidator(QtGui.QDoubleValidator())  # Only accepts numbers
-            fbar.fps.textChanged.connect(self.ping_input_change)
+            fbar.fps.textChanged.connect(self.ping_changing_input)
+
         # resolution row
         with self.res_bar as rbar:
             self.add_to_config({'res_dropdown': 'copy'}, rbar.dropdown.setCurrentText, rbar.dropdown.currentTextChanged)
             self.add_to_config({'resolution': 0}, rbar.line.setText, rbar.line.textChanged,
-                               config_type=int, widget_type=str)
+                               config_type=int,
+                               widget_type=str)
             rbar.line.setValidator(QtGui.QIntValidator())
             rbar.dropdown.currentIndexChanged.connect(self.res_dropdown_changed)
             rbar.dropdown.currentIndexChanged.emit(rbar.dropdown.currentIndex())
 
         with self.control_bar as cbar:
             cbar.start_button.clicked.connect(self.start_clicked)
-            # cbar.auto_detect.clicked.connect(self.detect_clicked)
             cbar.stop_button.clicked.connect(self.stop_clicked)
             cbar.yes_button.clicked.connect(self.yes_clicked)
             cbar.no_button.clicked.connect(self.no_clicked)
@@ -292,9 +310,8 @@ class MainWindow(QtWidgets.QWidget):
             self.ffmpeg_thread.config = self.config  # bind the thread configs
             self.ffmpeg_thread.progress.connect(self.progress_bar.setValue)
             self.ffmpeg_thread.finished.connect(self.ffmpeg_finished)
-            self.ffmpeg_thread.status.connect(lambda s: setattr(self.stat_dialog, "status", s))
-            # self.ffmpeg_thread.probed.connect(self.retrieve_auto_detected_settings)
-
+            self.ffmpeg_thread.status.connect(self.set_status)
+            self.ffmpeg_thread.max_prog.connect(self.progress_bar.setMaximum)
         t.print("Configured and connected widgets")
 
         pass
@@ -362,7 +379,6 @@ class MainWindow(QtWidgets.QWidget):
     def widget_list_to_attrs(idx: int, lst: Iterable[Widget], layout: QtWidgets.QLayout) -> WidgetGroup:
         new_attrs = []
         for widget in lst:
-            # rprint(f"adding: {widget} ")
             new_widget = widget.widget()
 
             new_widget.hideable = widget.hideable
@@ -395,6 +411,9 @@ class MainWindow(QtWidgets.QWidget):
         state = self.save_bar.autosave.checkState()
         self.config.save_on_change = {Qt.CheckState.Unchecked: False, Qt.CheckState.Checked: True}.get(state, False)
         self.config['autosave'] = self.config.save_on_change
+
+    def set_status(self, s: str):
+        self.stat_dialog.status = s
 
     @Slot()
     def save_clicked(self):
@@ -432,19 +451,19 @@ class MainWindow(QtWidgets.QWidget):
             self.output_bar.text.setText("")
 
     @Slot()
-    def ping_input_change(self):
+    def ping_changing_input(self):
         self.input_changed(self.input_bar.text.text())
 
     @Slot(int)
     def audio_dropdown_changed(self, value: int):
-        self.audio_bar.bitrate.setVisible({2: True}.get(value, False))
-        self.audio_bar.slider.setVisible({1: True}.get(value, False))
+        self.audio_bar.bitrate.setVisible(value == 2)
+        self.audio_bar.slider.setVisible(value == 1)
         self.audio_bar.bitrate.setText(str(self.config['audio_bitrate']))
         self.audio_bar.slider.setValue(self.config['audio_bitrate'] // 32)
 
     @Slot(int)
     def res_dropdown_changed(self, value: int):
-        self.res_bar.line.setVisible({0: False}.get(value, True))
+        self.res_bar.line.setVisible(value != 0)
 
     @Slot()
     def detect_clicked(self):
@@ -452,11 +471,6 @@ class MainWindow(QtWidgets.QWidget):
         self.ffmpeg_thread.path = self.config['input']
         # start the thread
         self.ffmpeg_thread.get_metadata()
-
-    # @Slot(dict)
-    # def retrieve_auto_detected_settings(self, dct: dict):
-    #     CfgDict('tmp.json', dct).save()
-    #     self.metadata = dct
 
     @Slot()
     def execute_ffmpeg(self):
@@ -484,7 +498,6 @@ class MainWindow(QtWidgets.QWidget):
             self.stat_dialog.status = "Input does not exist."
             return
 
-        print(self.output_bar.text.text())
         if os.path.exists(self.output_bar.text.text()):
             # trigger confirmation
             self.status = Status.OVERWRITE
@@ -557,26 +570,36 @@ class MainWindow(QtWidgets.QWidget):
 
 class FfmpegThread(QThread):
     progress = Signal(int)
+    max_prog = Signal(int)
     status = Signal(str)
     probed = Signal(dict)
     metadata: dict
     config: dict
     path: str
+    ffmpeg_path: str = 'ffmpeg'
+    ffprobe_path: str = 'ffprobe'
 
     def run(self):
-        self.metadata = self._get_metadata()
-        video_stream = [stream for stream in self.metadata['streams'] if stream['codec_type'] == 'video'][0]
-        duration = float(self.metadata['format']['duration'])
-        framerate = eval(video_stream['r_frame_rate'])
-        frame_count = int(duration * framerate)
+        self.check_for_ffmpeg()
 
-        # self.status.emit()
+        self.metadata = self._get_metadata(self.ffprobe_path)
+        video_stream = [stream for stream in self.metadata['streams'] if stream['codec_type'] == 'video'][0]
+
+        # approximate the frame count from the framerate and duration
+        if 'duration' in self.metadata['format']:
+            duration = float(self.metadata['format']['duration'])
+            framerate = eval(video_stream['r_frame_rate'])
+            frame_count = int(duration * framerate)
+            if self.config['fps']:
+                frame_count = int(self.config['fps'] * duration)
+        else:
+            frame_count = -1
+        self.max_prog.emit(frame_count)
+
         self.status.emit("Gathered metadata.")
 
-        if self.config['fps']:
-            frame_count = int(self.config['fps'] * duration)
-
-        out: subprocess.Popen = self.get_ffmpeg_stream(video_stream).run_async(pipe_stdout=True)
+        out: subprocess.Popen = self.get_ffmpeg_stream(video_stream).run_async(pipe_stdout=True,
+                                                                               cmd=self.ffmpeg_path)
         self.status.emit("configured ffmpeg.")
 
         while not out.poll():
@@ -589,11 +612,10 @@ class FfmpegThread(QThread):
                 dct[k] = v
 
             progress = int(dct['frame'])
-            print(dct)
             dlg = [
-                "Converting",
-                f"%{int(dct['frame']) * 100/frame_count:.2f}   [{dct['frame']} / {frame_count}]",
-                f"Total size: {byteFormat(dct['total_size'])}",
+                "Converting" if dct['progress'] == 'continue' else "Finished",
+                f"%{int(dct['frame']) * 100/frame_count:.2f}   [{dct['frame']} / ~{frame_count}]",
+                f"Total size: {byte_format(dct['total_size'])}",
                 f"speed: {dct['speed']}, fps: {dct['fps']}",
                 f"bitrate: {dct['bitrate']}",
             ]
@@ -603,21 +625,12 @@ class FfmpegThread(QThread):
                 dlg.append(f"duped framed: {dct['dup_frames']}")
 
             self.status.emit("\n".join(dlg))
-            self.progress.emit(100 * (progress / frame_count))
+            self.progress.emit(progress)
 
             if line == 'progress=end':
                 print("process ended")
                 print(f"{self.config['output']} has been created")
-                self.progress.emit(100)
                 break
-
-        # for line in out.stdout.readable():
-
-        # print(out)
-        # for i in range(10, 100, 2):
-        #     time.sleep(0.1)
-        #     self.send_progress(i)
-        # self.send_progress(100)
 
     def get_ffmpeg_stream(self, video_data):
         video = ffmpeg.input(self.config['input'])
@@ -633,7 +646,8 @@ class FfmpegThread(QThread):
         # audio
         if self.config['audio_dropdown'] != "copy":
             kwargs.update({'audio_bitrate': f"{self.config['audio_bitrate']}k"})
-
+        else:
+            kwargs.update({'c:a': "copy"})
         # threads, speed
         kwargs.update({
             'threads': self.config['threads'],
@@ -650,7 +664,7 @@ class FfmpegThread(QThread):
             dims = dims[0] * scales, dims[1] * scales
 
             if any(dim % 1 != 0 for dim in dims):
-                self.status.emit(f"Warning: predicted resolution: {dims} is not pixel perfect")
+                self.status.emit(f"Warning: predicted resolution: {dims[0]:.2f}x{dims[1]:.2f} is not pixel perfect")
                 time.sleep(3)
 
             video = video.filter('scale', f"{int(dims[0])}x{int(dims[1])}")
@@ -674,14 +688,121 @@ class FfmpegThread(QThread):
         print(video.get_args())
         return video
 
-    def get_metadata(self):
-        self.probed.emit(self._get_metadata())
+    def _get_metadata(self, cmd):
+        return ffmpeg.probe(self.path, cmd=cmd)
 
-    def _get_metadata(self):
-        return ffmpeg.probe(self.path)
+    def check_for_ffmpeg(self, attempts=0):
+        if attempts > 3:
+            rprint("Ffmpeg failed to download")
+            exit()
+        self.ffmpeg_path = shutil.which('ffmpeg', path='bin')  # or shutil.which('ffmpeg')
+        self.ffprobe_path = shutil.which('ffprobe', path='bin')  # or shutil.which('ffprobe')
+        if not (
+            (
+                (self.ffmpeg_path and os.path.exists(self.ffmpeg_path))
+                or
+                (self.ffprobe_path and os.path.exists(self.ffprobe_path))
+            )
+            # and False  # uncomment to test downloader
+        ):
+            self.status.emit("An ffmpeg binary is missing, attempting to download...")
+            self.download_ffmpeg()
+            self.check_for_ffmpeg(attempts + 1)
 
-    def send_progress(self, i: int):
-        self.progress.emit(i)
+    @staticmethod
+    def extract_and_save(
+            tfile: tarfile.TarFile,
+            tarpath: str,
+            outpath: str,
+            chmod=None,
+            overwrite=False
+    ) -> None:
+        '''Extracts a file from tfile and save it.
+
+        Parameters
+        ----------
+        tfile : tarfile.TarFile
+            The file to extract from
+        tarpath : str
+            The path in the tarfile to extract
+        outpath : str
+            The path to save to
+        chmod : _type_, optional
+            Calls os.chmod on the resulting file, by default None
+        overwrite : bool, optional
+            If exists, overwrite, by default False
+
+        Raises
+        ------
+        FileExistsError
+            If the file exists and overwrite is not called.
+        '''
+        if os.path.exists(outpath):
+            if not overwrite:
+                raise FileExistsError
+            else:
+                os.remove(outpath)
+
+        data = tfile.extractfile(tarpath)
+        with open(outpath, 'wb') as file:
+            for i in tqdm(data):
+                file.write(i)
+            if chmod:
+                if hasattr(chmod, '__iter__'):
+                    for attr in chmod:
+                        os.chmod(outpath, attr)
+                else:
+                    os.chmod(outpath, chmod)
+
+    def download_ffmpeg(self):
+        print("Downloading Ffmpeg")
+        # get list of builds
+        search_atts = {
+            'linux64-gpl-shared.tar.xz': {
+                'data': {},
+                'found': False
+            }
+        }
+
+        builds = json.loads(requests.get("https://api.github.com/repos/BtbN/Ffmpeg-Builds/releases").text)[0]['assets']
+        for build in builds:
+            for att in search_atts:
+                if att in build['name']:
+                    search_atts[att]['data'] = build
+            if all(att['found'] for att in search_atts.values()):
+                break
+        self.status.emit("Gathered metadata. Downloading...")
+        # download file
+        for att, data in search_atts.items():
+            data = data['data']
+            total = data['size']
+            url = data['browser_download_url']
+            chunksize = 8192
+            written = 0
+            self.max_prog.emit(total)
+
+            with requests.get(url, stream=True) as r:
+                with open(att, 'wb') as file:
+                    for chunk in r.iter_content(chunk_size=chunksize):
+                        file.write(chunk)
+                        self.progress.emit(written)
+
+        self.status.emit("Downloaded. Extracting...")
+        # Extract files to paths
+        os.makedirs('bin', exist_ok=True)
+        with tarfile.open('linux64-gpl-shared.tar.xz', 'r') as tf:
+            p = [
+                ('ffmpeg-master-latest-linux64-gpl-shared/bin/ffmpeg', f"{PROGRAM_ORIGIN}/bin/ffmpeg"),
+                ('ffmpeg-master-latest-linux64-gpl-shared/bin/ffprobe', f"{PROGRAM_ORIGIN}/bin/ffprobe")
+            ]
+            self.max_prog.emit(len(p))
+            for n, i in enumerate(tqdm(p)):
+                if not os.path.exists(i[1]):
+                    FfmpegThread.extract_and_save(tf, *i, chmod=stat.S_IEXEC)
+                self.progress.emit(n)
+
+        self.status.emit("Extracted. Attempting...")
+        time.sleep(1)
 
 
 if __name__ == "__main__":
@@ -693,114 +814,4 @@ if __name__ == "__main__":
     main_app_window = MainWindow(t, defaults)
     main_app_window.show()
     code = app.exec()
-    # defaults.save()
     sys.exit(code)
-
-    # def startFfmpeg(self):
-    #     self.ffmpeg_path = ffmpeg_utils.get_ffmpeg()
-    #     self.statDlg.setText("Converting...")
-    #     # Timer.start()
-
-    #     vindex = self.vDrop.currentIndex()
-    #     aindex = self.audioDrop.currentIndex()
-    #     rindex = self.resDrop.currentIndex()
-    # # handle resolutions
-    #     reses = {}
-    #     reses['input_res'] = [int(val.split("=")[1]) for val in subprocess.check_output(
-    #                          [self.ffmpeg_path[1], '-v', 'error', '-show_entries', 'stream=width,height',
-    #                           '-of', 'default=noprint_wrappers=1', self.inputText.text()]).
-    #                           decode("utf-8").split("\n")[:-1]]
-    #     reses['resLine'] = int(self.resLine.text()
-    #                            if self.resLine.text() != "" else 0)
-    #     reses['restio'] = (reses['resLine']/max(reses['input_res']) if rindex ==
-    #                        1 else reses['resLine']/min(reses['input_res']) if rindex == 2 else 1)
-    #     reses['new_res'] = [val*reses['restio'] for val in reses['input_res']]
-    #     Timer.print(reses['input_res'])
-    #     if type(reses['new_res'][0]) != int:
-    #         if not reses['new_res'][0].is_integer() or not reses['new_res'][1].is_integer():
-    #             self.statDlg.setText(
-    #                 "Warning: the specified resolution is not an int.\nresult may be imprecise")
-    #             Timer.print(f"{reses['new_res']} is imprecise, flooring...")
-    #     reses['new_res'] = [math.floor(val)-(math.floor(val) % 2)
-    #                         for val in reses['new_res']]
-    #     ffargs = {"path": self.ffmpeg_path[0],
-    #               "input":   ['-i', self.inputText.text()],
-    #               "output":  self.realOutput(),
-    #               "extension": self.outputDrop.currentText(),
-    #               "vidbr":   "".join([val for val in self.vBitrate.text() if val.isnumeric()]),
-    #               "audbr_s": str(self.aBitrateSlider.value()*32)+"k",
-    #               "audbr_i": self.aBitrateInput.text(),
-    #               "threads": ['-threads', str(self.threads.value())],
-    #               "speedDrop":   ['-preset', self.speedDrop.currentText()],
-    #               "fps":     "".join([val for val in self.fps.text() if val.isnumeric()]),
-    #               "scale":      f"{reses['new_res'][0]}:{reses['new_res'][1]}"
-    #               }
-    #     print(ffargs)
-    #     if self.outputDrop.currentText() == "png":
-    #         if not os.path.exists(os.path.dirname(ffargs['output'])):
-    #             os.mkdir(os.path.dirname(ffargs['output']))
-    #     # tmpdir for progress bar
-    #     tmpdir = self.inputText.text() + '.tmp'
-    #     if os.path.exists(tmpdir):
-    #         os.remove(tmpdir)
-    #     tmpfile = open(tmpdir, "w")
-
-    #     command = sum([[ffargs['path'], '-y'],
-    #                    ffargs['input'],
-    #                    ffargs['threads'],
-    #                    ffargs['speedDrop'],
-    #                    ['-progress', '-', '-nostats'],
-    #                    ['-r', ffargs['fps']] if ffargs['fps'] != "" else [],
-    #                    ], [])
-    #     if self.outputDrop.currentText() != "png":
-    #         command += sum([['-c:v', 'libx264'],
-    #                         ['-map', '0:v:?', '-map',
-    #                          '0:a:?', '-map_metadata', "0"],
-    #                         ['-b:v', ffargs['vidbr'] + "k"] if vindex == 0 and ffargs['vidbr'] != "" else
-    #                         ['-b:v', ffargs['vidbr']*1000] if vindex == 1 and ffargs['vidbr'] != "" else
-    #                         ['-crf', ffargs['vidbr']] if vindex == 2 and ffargs['vidbr'] != "" else
-    #                         ['-q:v', '0'],
-    #                         ['-c:a', 'copy'] if aindex == 0 else
-    #                         ['-b:a', ffargs['audbr_s']] if aindex == 1 else
-    #                         ['-b:a', ffargs['aidbr_i']
-    #                          ] if aindex == 2 else ['-an']
-    #                         ], [])
-    #     command += sum([['-vf', f'scale={ffargs["scale"]}'] if rindex != 0 and reses['input_res'] != reses['new_res'] else [],
-    #                     [ffargs['output']],
-    #                     ], [])
-    #     # return
-    #     ffmpegThread = subprocess.Popen(command,
-    #                                     stdout=tmpfile, stderr=tmpfile)
-    #     Timer.print("ffmpeg initialized")
-
-    #     self.changeButtons(1)
-    #     self.WidgetsEditable(0)
-    #     self.workButton.clicked.disconnect()
-    #     self.workButton.clicked.connect(ffmpegCancel)
-    #     self.ffmpegWaitThread = threading.Thread(target=ffmpegWait)
-    #     self.ffmpegWatchThread = threading.Thread(target=ffmpegWatch)
-    #     self.ffmpegWatchThread.start()
-    #     self.ffmpegWaitThread.start()
-
-    # def workClicked(self):
-    #     input_file = self.inputText.text()
-    #     if input_file.startswith("file://"):
-    #         self.inputText.setText(input_file.replace("file://", ""))
-    #         input_file = self.inputText.text()
-    #     work_step = self.workButton.text()
-    #     if self.statDlg.text() == "Awaiting input":
-    #         self.stopped_preemptively = False
-    #     if work_step == "Start":
-    #         if not os.path.exists(input_file):
-    #             self.statDlg.setText("Input file does not exist.")
-    #             print("File not found")
-    #             return
-    #     ffmpeg_output = self.realOutput()
-    #     if os.path.exists(ffmpeg_output):
-    #         print(ffmpeg_output, "already exists.")
-    #         self.statDlg.setText("Output already exists, overwrite?")
-    #         self.changeButtons(2)
-    #         self.WidgetsEditable(0)
-    #     else:
-    #         print("running...")
-    #         self.startFfmpeg()

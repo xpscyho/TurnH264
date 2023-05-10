@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tarfile
 import time
+import zipfile
+from io import BytesIO
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
@@ -37,7 +39,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFrame, QLabel, QLineEdit,
 from utilities import Timer
 
 CPU_COUNT = os.cpu_count()
-PROGRAM_ORIGIN = os.path.dirname(__file__)
+PROGRAM_ORIGIN = Path(os.path.dirname(__file__))
 
 
 def byte_format(size, suffix="B"):
@@ -612,6 +614,7 @@ class FfmpegThread(QThread):
                 dct[k] = v
 
             progress = int(dct['frame'])
+            self.progress.emit(min(progress, frame_count))
             dlg = [
                 "Converting" if dct['progress'] == 'continue' else "Finished",
                 f"%{int(dct['frame']) * 100/frame_count:.2f}   [{dct['frame']} / ~{frame_count}]",
@@ -625,10 +628,8 @@ class FfmpegThread(QThread):
                 dlg.append(f"duped framed: {dct['dup_frames']}")
 
             self.status.emit("\n".join(dlg))
-            self.progress.emit(progress)
 
             if line == 'progress=end':
-                print("process ended")
                 print(f"{self.config['output']} has been created")
                 break
 
@@ -695,8 +696,8 @@ class FfmpegThread(QThread):
         if attempts > 3:
             rprint("Ffmpeg failed to download")
             exit()
-        self.ffmpeg_path = shutil.which('ffmpeg', path='bin') or shutil.which('ffmpeg')
-        self.ffprobe_path = shutil.which('ffprobe', path='bin') or shutil.which('ffprobe')
+        self.ffmpeg_path = shutil.which('ffmpeg', path=PROGRAM_ORIGIN / 'bin')  # or shutil.which('ffmpeg')
+        self.ffprobe_path = shutil.which('ffprobe', path=PROGRAM_ORIGIN / 'bin')  # or shutil.which('ffprobe')
         if not (
             (
                 (self.ffmpeg_path and os.path.exists(self.ffmpeg_path))
@@ -709,10 +710,66 @@ class FfmpegThread(QThread):
             self.download_ffmpeg()
             self.check_for_ffmpeg(attempts + 1)
 
+    def download_ffmpeg(self):
+        print("Downloading Ffmpeg")
+        # get list of builds
+        sources = {
+                'linux': {
+                    'type': 'tar',
+                    'txt': PROGRAM_ORIGIN / 'ffmpeg.tar.xz',
+                    'src': "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+                },
+                'win32': {
+                    'type': 'zip',
+                    'txt': PROGRAM_ORIGIN / 'ffmpeg.zip',
+                    'src': "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+                }
+            }
+        files = {
+            'linux': {
+                'bin/ffmpeg': 'ffmpeg-master-latest-linux64-gpl/bin/ffmpeg',
+                'bin/ffprobe': 'ffmpeg-master-latest-linux64-gpl/bin/ffprobe'
+            },
+            'win32': {
+                'bin/ffmpeg.exe': 'ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe',
+                'bin/ffprobe.exe': 'ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe'
+            },
+        }
+        file_paths = files[sys.platform]
+        source = sources[sys.platform]
+        if not os.path.exists(source['txt']):
+            with open(source['txt'], 'wb') as file:
+                chunksize = 8192
+                with requests.get(source['src'], stream=True) as r:
+                    for chunk in r.iter_content(chunk_size=chunksize):
+                        file.write(chunk)
+
+        self.status.emit("File downloaded. Extracting...")
+        
+        if source['type'] == 'tar':
+            with tarfile.open(source['txt']) as tf:
+                for out, src in file_paths.items():
+                    pth = Path(out)
+                    if not pth.parent.exists():
+                        pth.parent.mkdir(parents=True)
+                    FfmpegThread.extract_and_save(
+                        tf, src, out, chmod=stat.S_IEXEC
+                    )
+        else:
+            with zipfile.ZipFile(source['txt']) as zf:
+                for out, src in file_paths.items():
+                    pth = Path(out)
+                    if not pth.parent.exists():
+                        pth.parent.mkdir(parents=True)
+                    FfmpegThread.extract_and_save(
+                        zf, src, out
+                    )
+        # exit()
+
     @staticmethod
     def extract_and_save(
-            tfile: tarfile.TarFile,
-            tarpath: str,
+            file: tarfile.TarFile | zipfile.ZipFile,
+            pth: str,
             outpath: str,
             chmod=None,
             overwrite=False
@@ -723,8 +780,8 @@ class FfmpegThread(QThread):
         ----------
         tfile : tarfile.TarFile
             The file to extract from
-        tarpath : str
-            The path in the tarfile to extract
+        pth : str
+            The path in the object to extract
         outpath : str
             The path to save to
         chmod : _type_, optional
@@ -742,8 +799,12 @@ class FfmpegThread(QThread):
                 raise FileExistsError
             else:
                 os.remove(outpath)
-
-        data = tfile.extractfile(tarpath)
+        
+        if isinstance(file, zipfile.ZipFile):
+            data = BytesIO(file.read(pth))
+        else:
+            data = file.extractfile(pth)
+            
         with open(outpath, 'wb') as file:
             for i in tqdm(data):
                 file.write(i)
@@ -754,55 +815,6 @@ class FfmpegThread(QThread):
                 else:
                     os.chmod(outpath, chmod)
 
-    def download_ffmpeg(self):
-        print("Downloading Ffmpeg")
-        # get list of builds
-        search_atts = {
-            'linux64-gpl-shared.tar.xz': {
-                'data': {},
-                'found': False
-            }
-        }
-
-        builds = json.loads(requests.get("https://api.github.com/repos/BtbN/Ffmpeg-Builds/releases").text)[0]['assets']
-        for build in builds:
-            for att in search_atts:
-                if att in build['name']:
-                    search_atts[att]['data'] = build
-            if all(att['found'] for att in search_atts.values()):
-                break
-        self.status.emit("Gathered metadata. Downloading...")
-        # download file
-        for att, data in search_atts.items():
-            data = data['data']
-            total = data['size']
-            url = data['browser_download_url']
-            chunksize = 8192
-            written = 0
-            self.max_prog.emit(total)
-
-            with requests.get(url, stream=True) as r:
-                with open(att, 'wb') as file:
-                    for chunk in r.iter_content(chunk_size=chunksize):
-                        file.write(chunk)
-                        self.progress.emit(written)
-
-        self.status.emit("Downloaded. Extracting...")
-        # Extract files to paths
-        os.makedirs('bin', exist_ok=True)
-        with tarfile.open('linux64-gpl-shared.tar.xz', 'r') as tf:
-            p = [
-                ('ffmpeg-master-latest-linux64-gpl-shared/bin/ffmpeg', f"{PROGRAM_ORIGIN}/bin/ffmpeg"),
-                ('ffmpeg-master-latest-linux64-gpl-shared/bin/ffprobe', f"{PROGRAM_ORIGIN}/bin/ffprobe")
-            ]
-            self.max_prog.emit(len(p))
-            for n, i in enumerate(tqdm(p)):
-                if not os.path.exists(i[1]):
-                    FfmpegThread.extract_and_save(tf, *i, chmod=stat.S_IEXEC)
-                self.progress.emit(n)
-
-        self.status.emit("Extracted. Attempting...")
-        time.sleep(1)
 
 
 if __name__ == "__main__":

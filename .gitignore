@@ -12,3 +12,6 @@ TurnH264-2.py
 *__pycache__*
 TurnH264
 config.json
+ffmpeg.zip
+ffmpeg.tar.xz
+bin/

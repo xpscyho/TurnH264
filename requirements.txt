@@ -5,3 +5,4 @@ pyinstaller
 tqdm
 rich
 cfg_argparser
+ffmpeg-python

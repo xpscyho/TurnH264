@@ -8,6 +8,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import traceback
 import time
 import zipfile
 from io import BytesIO
@@ -22,8 +23,7 @@ from tqdm import tqdm
 
 try:
     from rich import print as rprint
-    from rich.traceback import install
-    install()  # show_locals=True
+
 except ImportError:
     rprint = pprint
 
@@ -195,7 +195,6 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("TurnH264")
         self.resize(400, 450)
         self.setMinimumSize(320, 300)
-
         self.layout = QtWidgets.QGridLayout(self)
         self.barnum = 0
 
@@ -308,15 +307,27 @@ class MainWindow(QtWidgets.QWidget):
             cbar.yes_button.clicked.connect(self.yes_clicked)
             cbar.no_button.clicked.connect(self.no_clicked)
 
-            self.ffmpeg_thread = FfmpegThread(self)
-            self.ffmpeg_thread.config = self.config  # bind the thread configs
-            self.ffmpeg_thread.progress.connect(self.progress_bar.setValue)
-            self.ffmpeg_thread.finished.connect(self.ffmpeg_finished)
-            self.ffmpeg_thread.status.connect(self.set_status)
-            self.ffmpeg_thread.max_prog.connect(self.progress_bar.setMaximum)
+        # ffmpeg thread
+        self.ffmpeg_thread = FfmpegThread(self)
+        self.ffmpeg_thread.config = self.config  # bind the thread configs
+        self.ffmpeg_thread.progress.connect(self.progress_bar.setValue)
+        self.ffmpeg_thread.finished.connect(self.ffmpeg_finished)
+        self.ffmpeg_thread.status.connect(self.set_status)
+        self.ffmpeg_thread.max_prog.connect(self.progress_bar.setMaximum)
+        self.ffmpeg_thread.change_title.connect(self.change_title)
+
         t.print("Configured and connected widgets")
 
         pass
+
+    def change_title(self, s):
+        if s:
+            self.setWindowTitle(f"{s} | TurnH264")
+        else:
+            self.setWindowTitle("TurnH264")
+
+    def dropEvent(self, event):
+        print(event)
 
     def closeEvent(self, event):
 
@@ -534,6 +545,7 @@ class MainWindow(QtWidgets.QWidget):
         self.control_mode = Mode.START
         self.status = Status.READY
         self.ffmpeg_thread.terminate()
+        self.ffmpeg_thread.stream.kill()
         self.progress_bar.setValue(0)
         self.stat_dialog.status = "Ffmpeg stopped."
         print("Thread stopped")
@@ -612,6 +624,7 @@ class FileInfo:  # small dataclass used in FfmpegThread.download_ffmpeg
 class FfmpegThread(QThread):
     progress = Signal(int)
     max_prog = Signal(int)
+    change_title = Signal(str)
     status = Signal(str)
     probed = Signal(dict)
     metadata: dict
@@ -619,10 +632,19 @@ class FfmpegThread(QThread):
     path: str
     ffmpeg_path: str = 'ffmpeg'
     ffprobe_path: str = 'ffprobe'
+    stream: subprocess.Popen
 
     def run(self):
-        self.check_for_ffmpeg()
+        # self._run()
+        try:
+            self._run()
+        except Exception as e:
+            traceback.print_exception(e)
+            self.change_title.emit("Error")
+            self.status.emit(f"{type(e).__name__}: {e}")
 
+    def _run(self):
+        self.check_for_ffmpeg()
         self.metadata = self._get_metadata(self.ffprobe_path)
         video_stream = [stream for stream in self.metadata['streams'] if stream['codec_type'] == 'video'][0]
 
@@ -639,20 +661,23 @@ class FfmpegThread(QThread):
 
         self.status.emit("Gathered metadata.")
 
-        out: subprocess.Popen = self.get_ffmpeg_stream(video_stream).run_async(pipe_stdout=True,
-                                                                               cmd=self.ffmpeg_path)
+        self.stream: subprocess.Popen = self.get_ffmpeg_stream(video_stream).run_async(pipe_stdout=True,
+                                                                                       cmd=self.ffmpeg_path)
         self.status.emit("configured ffmpeg.")
 
-        while not out.poll():
+        while not self.stream.poll():
             dct = {}
             line = ""
             while not 'progress' in line:
-                line = out.stdout.readline().decode('utf-8').strip()
+                line = self.stream.stdout.readline().decode('utf-8').strip()
                 time.sleep(0.01)
                 k, v = line.split('=')
                 dct[k] = v
 
             progress = int(dct['frame'])
+            if int(100 * progress / frame_count) % 5 == 0:
+                self.change_title.emit(f"%{100 * progress / frame_count:.2f}")
+
             self.progress.emit(min(progress, frame_count))
             dlg = [
                 "Converting" if dct['progress'] == 'continue' else "Finished",
@@ -781,12 +806,13 @@ class FfmpegThread(QThread):
         with exe_info.type(exe_info.out) as f:
             for out, src in exe_info.paths.items():
                 Path(out).parent.mkdir(parents=True, exist_ok=True)
-                FfmpegThread.extract_and_save(
-                    f,
-                    src,
-                    out,
-                    chmod=stat.S_IEXEC if sys.platform != 'win32' else None
-                )
+                if not Path(out).exists():
+                    FfmpegThread.extract_and_save(
+                        f,
+                        src,
+                        out,
+                        chmod=stat.S_IEXEC if sys.platform != 'win32' else None
+                    )
 
     @staticmethod
     def extract_and_save(
@@ -822,10 +848,10 @@ class FfmpegThread(QThread):
             else:
                 os.remove(outpath)
 
-        with open(outpath, 'wb') as file:
+        with open(outpath, 'wb') as out:
             data = file.read(pth)
             for i in tqdm(data):
-                file.write(i)
+                out.write(i)
             if chmod:
                 if hasattr(chmod, '__iter__'):
                     for attr in chmod:

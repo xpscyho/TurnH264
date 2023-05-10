@@ -695,8 +695,8 @@ class FfmpegThread(QThread):
         if attempts > 3:
             rprint("Ffmpeg failed to download")
             exit()
-        self.ffmpeg_path = shutil.which('ffmpeg', path='bin')  # or shutil.which('ffmpeg')
-        self.ffprobe_path = shutil.which('ffprobe', path='bin')  # or shutil.which('ffprobe')
+        self.ffmpeg_path = shutil.which('ffmpeg', path='bin') or shutil.which('ffmpeg')
+        self.ffprobe_path = shutil.which('ffprobe', path='bin') or shutil.which('ffprobe')
         if not (
             (
                 (self.ffmpeg_path and os.path.exists(self.ffmpeg_path))
